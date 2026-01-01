@@ -1,0 +1,47 @@
+const linksData = [
+   { name: "教學組專用課表查詢系統V6.0", description: "加入每週科目課表，可以自訂需要的項目轉出網頁下載，功能更完整<br><a href='課表測試資料.xlsx' >demo檔案：網頁測試用.xlsx</a>", link: "教學組專用課表查詢系統V6.0.html" },
+   { name: "教學組專用課表查詢V1.6", description: "比上一版加入同班教師無課調課查詢，功能更強<br><a href='課表測試資料.xlsx' >demo檔案：網頁測試用.xlsx</a>", link: "班級課表查詢V1.6.html" },
+    { name: "教學組專用課表查詢V1.5", description: "本程式加入全校教師節次任課一覽表，顯示教師節次有無課務，功能更完整<br><a href='課表測試資料.xlsx' >demo檔案：網頁測試用.xlsx</a>", link: "班級課表查詢V1.5.html" },
+
+    { name: "教學組專用課表查詢V1.3", description: "本程式主要將課表試算表檔轉換成多功能課表查詢網頁，提供教學組離線查詢專用<br><a href='課表測試資料.xlsx' >demo檔案：網頁測試用.xlsx</a>", link: "班級課表查詢V1.3.html" },
+
+   { name: "試算表轉為網頁查詢系統V1.5", description: "V1.5版新增顯示結果方式與預設欄位名稱的修改<br><a href='網頁測試用.xlsx' >demo檔案：網頁測試用.xlsx</a>", link: "試算表轉出查詢網頁V1.5.html" },
+  { name: "試算表轉為網頁查詢系統V1.0", description: "只要載入試算表XLXS，可以將內容轉為資料查詢網頁，提供資料加密的功能<br><a href='網頁測試用.xlsx' >demo檔案：網頁測試用.xlsx</a>", link: "試算表轉出查詢網頁.html" },
+  { name: "高雄市YouBike即時查詢系統", description: "透過開放資訊即時抓取數據分析呈現目前YouBike狀態", link: "高雄市youbike查詢.html" },
+  { name: "從地圖位置查詢天氣", description: "點選地圖所在地，按下天氣查詢即可顯示目前天氣", link: "可愛天氣查詢系統.html" },
+  { name: "html格式化工具", description: "讓雜亂的html檔案內容格式化整齊", link: "html格式化工具.html" },
+  { name: "ASP&JavaScript代碼格式化工具", description: "讓雜亂的asp檔案內容格式化整齊", link: "ASP&JavaScript代碼格式化工具" },
+  { name: "台灣新聞直播頻道選台器", description: "直播新聞頻道整合在一起", link: "台灣新聞直播頻道選台器.html" },  
+  { name: "國中生畢業生生涯進路調查表", description: "高雄市畢業生生涯進路調查表", link: "調查表v2.html" },
+  { name: "教師自用的網頁白板", description: "多功能單機自用", link: "教師白板V4.html" },
+  { name: "DBF檔案管理", description: "dbf檔案管理", link: "DBF檔案管理系統.html" },
+  { name: "EXCEL檔案管理", description: "EXCEL檔案管理", link: "EXCEL管理.html" },
+  { name: "SVG編輯", description: "SVG編輯管理", link: "SVG編輯V2.html" },
+  { name: "localstorage管理系統", description: "localstorage管理系統", link: "localstorage管理系統.html" },
+  { name: "瀏覽器IndexedDB 管理系統", description: "瀏覽器IndexedDB 管理系統", link: "瀏覽器IndexedDB 管理系統.html" },
+  { name: "網頁安裝檔案生成器", description: "網頁安裝檔案生成器", link: "網頁安裝檔案生成器.html" },  
+  { name: "MQTT教學互動加密版V3", description: "利用MQTT來做教學互動", link: "MQTT教學互動加密版V3.html" },
+  { name: "可愛班級聊天室", description: "利用MQTT來做班級聊天室", link: "可愛班級聊天室.html" },
+  { name: "教師座位分配V12版", description: "教師座位分配套印XML版本<br><a href='座位配置圖測試.xml' >demo檔案：座位配置圖測試.xml</a>", link: "教師座位分配V12OK版.html" },
+  { name: "專業影音播放器V1", description: "網頁版影音播放器V1", link: "專業影音播放器V1.html" },
+  { name: "中文簡繁互轉", description: "中文簡繁互轉含常用語詞轉換", link: "中文簡繁互轉.html" },
+  { name: "PDF專用工具", description: "PDF處理工具集，包含浮水印、頁面管理、合併和格式轉換功能", link: "pdf-tools/index.html" },
+  { name: "AutoHotkey 程式產生器V5", description: "自用的AutoHotkey程式產生器，功能不夠完整", link: "AutoHotkey 程式產生器V5.html" },
+  { name: "3D太陽軌道動畫", description: "利用three.製作的簡易3D太陽軌道動畫", link: "3D太陽軌道動畫.html" },
+  { name: "影音錄影工具V2", description: "測試利用瀏覽器影音錄影的功能", link: "影音錄影工具V2.html" },
+  { name: "cam控制走迷宮遊戲", description: "透過cam利用手勢控制走迷宮遊戲", link: "cam控制走迷宮遊戲.html" },
+  { name: "手抓寶物-手勢辨識遊戲", description: "透過cam利用手勢位置抓取寶物-手勢辨識遊戲", link: "手抓寶物-手勢辨識遊戲.html" },
+  { name: "SQLite 資料庫管理系統", description: "可載入sqlite資料庫進行編修管理", link: "SQLite 資料庫管理系統.html" },
+  { name: "IIS Log Analyzer (前端版)", description: "載入IIS日誌檔進行分析", link: "IIS Log Analyzer (前端版).html" },
+  { name: "Google協作平台內容提取器", description: "將Google協作平台設計的網頁內容提取為獨立網頁", link: "Google協作平台內容提取器.html" },
+  { name: "QR Code 線上處理工具", description: "功能說明：QR Code 掃描 及QR Code 生成", link: "QRCode線上處理工具.html" },
+  { name: "圖片自動裁切工具", description: "圖片自動裁切工具，對於自製line圖貼切割最方便", link: "圖片自動裁切工具.html" },
+  { name: "Google sites平台內嵌網頁內容提取器", description: "將Google協作平台設計的內嵌網頁網頁內容提取為獨立網頁", link: "Google內嵌網頁內容提取器.html" },
+  { name: "Google Apps Script 網頁還原工具", description: "將Google Apps Script 網頁還原為獨立網頁", link: "GAS網頁還原工具.html" },
+  { name: "SQLite 資料庫管理系統V3", description: "可載入sqlite資料庫進行編修管理", link: "SQLite 資料庫管理系統V3.html" },
+  { name: "資料夾檔案日期整理工具", description: "根據資料夾內檔案日期分類整理工具", link: "檔案日期整理工具.html" },
+
+
+
+
+];
