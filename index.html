@@ -3,20 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>與AI合作設計的有用網頁</title>
+    <title>Koming的2026工具箱</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入圓潤的字體，符合動物森友會風格 -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #1a5276;
-            --secondary-color: #2980b9;
-            --accent-color: #3498db;
-            --light-color: #ecf0f1;
-            --dark-color: #2c3e50;
-            --success-color: #27ae60;
-            --warning-color: #f39c12;
-            --danger-color: #e74c3c;
-            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            --transition: all 0.3s ease;
+            /* 動物森友會配色變數 */
+            --ac-leaf-green: #88c999;
+            --ac-dark-green: #5fa16b;
+            --ac-wood-light: #e6c9a8;
+            --ac-wood-dark: #c19a6b;
+            --ac-sky-blue: #84d4e7;
+            --ac-water-blue: #6fa8dc;
+            --ac-yellow: #f7dc6f;
+            --ac-bg-color: #fcfdf5;
+            --ac-text-color: #5d4037;
+            --ac-shadow: 4px 4px 0px rgba(93, 64, 55, 0.2);
+            --ac-shadow-hover: 6px 6px 0px rgba(93, 64, 55, 0.3);
+            --transition: cubic-bezier(0.175, 0.885, 0.32, 1.275); /* 彈性過渡效果 */
         }
 
         * {
@@ -26,260 +31,368 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
-            color: var(--dark-color);
+            font-family: 'Nunito', 'Segoe UI', sans-serif;
+            background-color: var(--ac-bg-color);
+            /* 添加一個簡單的格子背景模擬地板或草地 */
+            background-image: 
+                radial-gradient(var(--ac-leaf-green) 15%, transparent 16%),
+                radial-gradient(var(--ac-leaf-green) 15%, transparent 16%);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+            background-blend-mode: overlay;
+            color: var(--ac-text-color);
             line-height: 1.6;
+            padding-bottom: 4rem;
         }
 
+        /* Header 區域 - 像遊戲標題畫面 */
         .header {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            padding: 3rem 1rem;
+            background: linear-gradient(180deg, var(--ac-sky-blue) 0%, #b3e5fc 100%);
+            padding: 4rem 1rem 3rem;
             text-align: center;
-            box-shadow: var(--shadow);
             position: relative;
-            overflow: hidden;
+            margin-bottom: 2rem;
+            border-bottom: 6px solid white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
 
+        /* 裝飾用的雲朵 */
         .header::before {
-            content: "";
+            content: "\f0c2"; /* FontAwesome Cloud */
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
             position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
-            transform: rotate(45deg);
+            top: 20px;
+            left: 10%;
+            font-size: 3rem;
+            color: rgba(255, 255, 255, 0.8);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .header::after {
+            content: "\f0c2";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            top: 50px;
+            right: 15%;
+            font-size: 2.5rem;
+            color: rgba(255, 255, 255, 0.8);
+            animation: float 8s ease-in-out infinite reverse;
         }
 
         .header h1 {
-            font-size: 2.5rem;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 2.8rem;
+            color: white;
+            text-shadow: 3px 3px 0px var(--ac-leaf-green);
             margin-bottom: 0.5rem;
             position: relative;
-            z-index: 1;
-            font-weight: 700;
-            letter-spacing: 1px;
+            z-index: 2;
         }
 
         .header .subtitle {
-            font-size: 1.1rem;
-            opacity: 0.9;
+            font-size: 1.2rem;
+            color: var(--ac-dark-green);
+            background-color: rgba(255, 255, 255, 0.8);
+            display: inline-block;
+            padding: 0.5rem 1.5rem;
+            border-radius: 50px;
+            border: 3px solid var(--ac-wood-dark);
             position: relative;
+            z-index: 2;
+            font-weight: 700;
+        }
+
+        /* 簡介區塊 - 像遊戲中的對話框 */
+        .intro {
+            max-width: 900px;
+            margin: -1.5rem auto 2rem;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 20px;
+            border: 4px solid var(--ac-text-color);
+            box-shadow: 8px 8px 0px rgba(93, 64, 55, 0.2);
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* 對話框的小尾巴 */
+        .intro::after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 15px 15px 0;
+            border-style: solid;
+            border-color: var(--ac-text-color) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .intro::before {
+            content: '';
+            position: absolute;
+            bottom: -9px; /* 白色尾巴疊加 */
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 12px 12px 0;
+            border-style: solid;
+            border-color: white transparent;
+            display: block;
+            width: 0;
             z-index: 1;
         }
 
-        .intro {
-            background-color: white;
-            padding: 2rem;
-            text-align: center;
-            max-width: 800px;
-            margin: 2rem auto;
-            border-radius: 10px;
-            box-shadow: var(--shadow);
-        }
-
-        .intro p {
-            color: #555;
-            font-size: 1.1rem;
-        }
-
         .container {
-            max-width: 1200px;
+            max-width: 1400px; /* 較寬的容器以容納4列 */
             margin: 0 auto;
-            padding: 0 1rem;
+            padding: 0 1.5rem;
         }
 
+        /* 核心佈局：每列4個 */
         .links {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 2rem;
-            padding: 2rem 0;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            padding: 1rem 0;
         }
 
+        /* 卡片設計 - 像遊戲中的物品欄或村民卡片 */
         .link-box {
             background-color: white;
-            border-radius: 12px;
-            padding: 2rem;
+            border-radius: 20px;
+            padding: 2rem 1.5rem;
             text-align: center;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
+            box-shadow: var(--ac-shadow);
+            border: 3px solid #eee;
+            transition: transform 0.3s var(--transition), box-shadow 0.3s var(--transition);
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100%;
+            justify-content: space-between;
+            min-height: 280px;
             position: relative;
+            cursor: pointer;
             overflow: hidden;
         }
 
+        .link-box:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--ac-shadow-hover);
+            border-color: var(--ac-leaf-green);
+        }
+
+        /* 卡片頂部的裝飾條 */
         .link-box::before {
             content: "";
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
-            height: 5px;
-            background: linear-gradient(90deg, var(--accent-color), var(--secondary-color));
+            height: 8px;
+            background-color: var(--ac-sky-blue);
+            transition: background-color 0.3s;
         }
 
-        .link-box:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        .link-box:hover::before {
+            background-color: var(--ac-leaf-green);
+        }
+
+        /* 圖標樣式 - 模仿遊戲圖示 */
+        .icon-wrapper {
+            width: 80px;
+            height: 80px;
+            background-color: #f0f9f0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            border: 3px dashed var(--ac-leaf-green);
         }
 
         .link-box .icon {
-            font-size: 3rem;
-            margin-bottom: 1.5rem;
-            color: var(--accent-color);
-            transition: var(--transition);
+            font-size: 2.5rem;
+            color: var(--ac-wood-dark);
+            transition: transform 0.4s var(--transition);
         }
 
         .link-box:hover .icon {
-            transform: scale(1.2);
-            color: var(--secondary-color);
+            transform: rotate(10deg) scale(1.15);
         }
 
-        .link-box a {
-            color: var(--primary-color);
-            text-decoration: none;
-            font-size: 1.3rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            transition: var(--transition);
-        }
-
-        .link-box:hover a {
-            color: var(--secondary-color);
+        .link-box h3 {
+            font-family: 'Fredoka', sans-serif;
+            color: var(--ac-text-color);
+            font-size: 1.25rem;
+            margin-bottom: 0.8rem;
+            line-height: 1.3;
         }
 
         .link-box p {
-            font-size: 1rem;
-            color: #666;
-            margin: 0;
+            font-size: 0.95rem;
+            color: #795548;
+            margin-bottom: 1.5rem;
+            flex-grow: 1;
+        }
+
+        /* 按鈕樣式 */
+        .btn-visit {
+            background-color: var(--ac-yellow);
+            color: var(--ac-text-color);
+            padding: 0.5rem 1.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border: 2px solid var(--ac-text-color);
+            transition: all 0.2s;
+            display: inline-block;
+        }
+
+        .btn-visit:hover {
+            background-color: var(--ac-leaf-green);
+            color: white;
+            transform: scale(1.05);
         }
 
         .footer {
-            background-color: var(--dark-color);
-            color: white;
             text-align: center;
-            padding: 2rem;
+            padding: 3rem 1rem;
             margin-top: 3rem;
+            color: var(--ac-text-color);
         }
 
         .footer p {
-            margin: 0;
-            opacity: 0.8;
+            background: rgba(255,255,255,0.7);
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            font-size: 0.9rem;
         }
 
-        @media (max-width: 768px) {
+        /* 響應式設計 - 根據螢幕寬度自動調整 */
+        @media (max-width: 1200px) {
+            .links {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .links {
+                grid-template-columns: repeat(2, 1fr);
+            }
             .header h1 {
                 font-size: 2rem;
-            }
-            
-            .links {
-                grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-                gap: 1.5rem;
             }
         }
 
         @media (max-width: 576px) {
-            .header {
-                padding: 2rem 1rem;
-            }
-            
-            .header h1 {
-                font-size: 1.8rem;
-            }
-            
             .links {
                 grid-template-columns: 1fr;
             }
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            .header {
+                padding: 3rem 1rem 2rem;
+            }
+        }
+
+        /* 動畫定義 */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Koming與AI合作設計的有用小工具2025年版</h1>
-        <div class="subtitle">專業、高效、安全的線上工具集合</div>
+        <h1>Koming 2026網頁工具箱</h1>
+        <div class="subtitle"> 數位創作 · 快樂分享，全部在本機執行</div>
     </div>
     
     <div class="container">
-        <div class="intro">
-            <p>這是透過AI協助設計的網頁工具，提供大家參考使用，資料不會上傳，都在電腦本機處理。</p>
-        </div>
+       
         
         <div class="links" id="links">
-            <!-- Links will be dynamically inserted here -->
+            <!-- 內容將由 JavaScript 動態生成 -->
         </div>
     </div>
     
     <div class="footer">
-        <p>© 2025 Koming與AI合作設計 | 所有工具均在本地運行，保護您的隱私安全</p>
+        <p>© 2026 Koming x AI Design | 資料不會上傳，隱私受保護 🌲</p>
     </div>
 
-    <!-- 使用動態載入的方式，並添加時間戳記 -->
-    <script id="dataScript"></script>
     <script>
-        // 動態載入 data.js 並加上時間戳記，確保每次都獲取最新版本
-        const script = document.getElementById('dataScript');
-        script.src = 'data.js?t=' + new Date().getTime();
-        
-        // 校園與風景相關圖標集合
-        const iconClasses = [
-            // 校園相關圖標
-            'fa-school', 'fa-graduation-cap', 'fa-book', 'fa-chalkboard-teacher',
-            'fa-user-graduate', 'fa-laptop', 'fa-flask', 'fa-microscope',
-            'fa-calculator', 'fa-ruler-combined', 'fa-clipboard-list', 'fa-pen',
+        // 模擬資料 (為了讓這個單頁檔可以直接運作，我們在這裡定義資料)
+        const linksData = [
+            { name: "色彩搭配器", link: "#", description: "輕鬆選出動物森友會風格的配色方案。" },
             
-            // 風景相關圖標
-            'fa-mountain', 'fa-tree', 'fa-sun', 'fa-cloud-sun',
-            'fa-water', 'fa-leaf', 'fa-campground', 'fa-umbrella-beach',
-            'fa-snowflake', 'fa-wind', 'fa-cloud-rain', 'fa-bridge',
-            'fa-landmark', 'fa-monument', 'fa-mosque', 'fa-church',
-            'fa-synagogue', 'fa-hindu', 'fa-vihara', 'fa-torii-gate',
-            'fa-archway', 'fa-dharmachakra', 'fa-om', 'fa-star-and-crescent',
-            'fa-menorah', 'fa-cross', 'fa-yin-yang', 'fa-peace'
+            { name: "文字語音轉換", link: "#", description: "將文字轉換為語音播放。" }
+        ];
+
+        // 動物森友會風格圖標集合
+        const iconClasses = [
+            'fa-tree', 'fa-seedling', 'fa-leaf', 'fa-cloud-sun',
+            'fa-trowel', 'fa-worm', 'fa-bug', 'fa-fish',
+            'fa-dove', 'fa-feather', 'fa-compass', 'fa-map-signs',
+            'fa-store', 'fa-box-open', 'fa-gift', 'fa-envelope-open-text',
+            'fa-pencil-alt', 'fa-paint-brush', 'fa-camera-retro', 'fa-music'
         ];
         
-        // 專業配色方案
-        const colorSchemes = [
-            { primary: '#3498db', secondary: '#2980b9' },
-            { primary: '#2ecc71', secondary: '#27ae60' },
-            { primary: '#e74c3c', secondary: '#c0392b' },
-            { primary: '#f39c12', secondary: '#d35400' },
-            { primary: '#9b59b6', secondary: '#8e44ad' },
-            { primary: '#1abc9c', secondary: '#16a085' },
-            { primary: '#34495e', secondary: '#2c3e50' }
+        // 隨機邊框顏色 (對應不同的家具系列)
+        const borderColors = [
+            '#84d4e7', // Sky
+            '#88c999', // Leaf
+            '#f7dc6f', // Yellow (Fairy)
+            '#e6c9a8', // Wood
+            '#f1948a', // Pink (Cherry Blossom)
+            '#bb8fce'  // Purple (elegant)
         ];
-        
+
         function getRandomIcon() {
             return iconClasses[Math.floor(Math.random() * iconClasses.length)];
         }
         
-        function getRandomColorScheme() {
-            return colorSchemes[Math.floor(Math.random() * colorSchemes.length)];
+        function getRandomBorderColor() {
+            return borderColors[Math.floor(Math.random() * borderColors.length)];
         }
         
         function loadLinks(data) {
             const linksContainer = document.getElementById('links');
             
             data.forEach(item => {
-                const colorScheme = getRandomColorScheme();
                 const linkBox = document.createElement('div');
                 linkBox.className = 'link-box';
+                const borderColor = getRandomBorderColor();
                 
-                // 添加自定義樣式
-                linkBox.style.setProperty('--accent-color', colorScheme.primary);
-                linkBox.style.setProperty('--secondary-color', colorScheme.secondary);
-                
+                // 動態設定頂部裝飾條顏色
+                linkBox.style.setProperty('--theme-color', borderColor);
+
                 linkBox.innerHTML = `
-                    <div class="icon">
-                        <i class="fas ${getRandomIcon()}"></i>
+                    <div class="icon-wrapper" style="border-color: ${borderColor}; background-color: ${borderColor}20;">
+                        <i class="fas ${getRandomIcon()} icon" style="color: ${borderColor};"></i>
                     </div>
-                    <a href="${item.link}" target="_blank">${item.name}</a>
-                    <p>${item.description}</p>
+                    <div>
+                        <h3>${item.name}</h3>
+                        <p>${item.description}</p>
+                    </div>
+                    <a href="${item.link}" class="btn-visit" style="background-color: ${borderColor};">
+                        前往使用 <i class="fas fa-arrow-right" style="font-size:0.8em; margin-left:5px;"></i>
+                    </a>
                 `;
+                
+                // 為整個卡片添加點擊事件 (除了按鈕本身)
+                linkBox.addEventListener('click', (e) => {
+                    if(e.target.tagName !== 'A') {
+                        window.open(item.link, '_blank');
+                    }
+                });
                 
                 linksContainer.appendChild(linkBox);
             });
@@ -287,19 +400,13 @@
         
         // 頁面載入後執行
         window.addEventListener('DOMContentLoaded', function() {
-            // 等待 data.js 載入完成
-            script.onload = function() {
-                if (typeof linksData !== 'undefined') {
-                    loadLinks(linksData);
-                } else {
-                    console.error('linksData is not defined');
-                }
-            };
-            
-            // 處理載入錯誤
-            script.onerror = function() {
-                console.error('Failed to load data.js');
-            };
+            // 直接使用內建的 linksData，不需要等待外部檔案
+            if (linksData && linksData.length > 0) {
+                loadLinks(linksData);
+            } else {
+                console.error('No data found');
+                document.getElementById('links').innerHTML = '<p style="text-align:center; grid-column: 1/-1;">目前沒有工具資料。</p>';
+            }
         });
     </script>
 </body>
