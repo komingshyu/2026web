@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考試看板系統修改版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* 基礎樣式 */
+        body {
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            overflow: hidden; 
+            background-color: #f3f4f6;
+        }
+
+        .text-shadow {
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .hidden-input {
+            display: none;
+        }
+
+        .btn-active:active {
+            transform: scale(0.95);
+        }
+
+        .track-transition {
+            transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
+        }
+
+        /* 設定視窗動畫 */
+        .modal-enter {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        .modal-enter-active {
+            opacity: 1;
+            transform: scale(1);
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+        }
+        .modal-exit {
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.2s ease-in, transform 0.2s ease-in;
+        }
+
+        /* 滾動條樣式 */
+        .custom-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- 預設設定資料 (根據 PDF 文件修正) ---
+        const DEFAULT_CONFIG = {
+            schedules: {
+                // 第一天：
+                day1: [
+                    { id: 'd1-1', type: 'exam', start: '08:25', end: '09:25', label: '英 語' },
+                    { id: 'd1-b1', type: 'break', start: '09:25', end: '09:40', label: '下課' },
+                    { id: 'd1-2', type: 'exam', start: '09:40', end: '10:40', label: '地科(3)/自習(12)' },
+                    { id: 'd1-b2', type: 'break', start: '10:40', end: '10:55', label: '下課' },
+                    { id: 'd1-3', type: 'exam', start: '10:55', end: '11:55', label: '社 會' },
+                    { id: 'd1-lunch', type: 'break', start: '11:55', end: '13:30', label: '午休' },
+                    { id: 'd1-4', type: 'exam', start: '13:30', end: '14:30', label: '自 習' },
+                    { id: 'd1-b3', type: 'break', start: '14:30', end: '14:45', label: '下課' },
+                    { id: 'd1-5', type: 'exam', start: '14:45', end: '15:35', label: '健 教' }
+                ],
+                // 第二天：
+                day2: [
+                    { id: 'd2-1', type: 'exam', start: '08:25', end: '09:25', label: '數 學' },
+                    { id: 'd2-b1', type: 'break', start: '09:25', end: '09:40', label: '下課' },
+                    { id: 'd2-2', type: 'exam', start: '09:40', end: '10:40', label: '生物(1)/理化(23)' },
+                    { id: 'd2-b2', type: 'break', start: '10:40', end: '10:55', label: '下課' },
+                    { id: 'd2-3', type: 'exam', start: '10:55', end: '11:55', label: '國文(3)/自習(12)' },
+                    { id: 'd2-lunch', type: 'break', start: '11:55', end: '13:30', label: '午休' },
+                    { id: 'd2-4', type: 'exam', start: '13:30', end: '14:30', label: '自 習' },
+                    { id: 'd2-b3', type: 'break', start: '14:30', end: '14:45', label: '下課' },
+                    { id: 'd2-5', type: 'exam', start: '14:45', end: '15:45', label: '國 文' }
+                ]
+            },
+            examMessages: [
+                "考卷記得寫上班級姓名座號",
+                "有問題舉手問老師，需要撿東西請監考老師幫忙",
+                "不會寫的題目跳過寫會的題目",
+                "耐心、細心、小心",
+                "考卷有不會的問題等出題老師來了再問",
+                "不要轉頭玩東西，寫完多檢查",
+                "檢查完再檢查或趴下休息",
+                "考試即將結束，檢查有沒有寫答案抄錯"
+            ],
+            breakMessages: [
+                "等監考老師點完再離開座位下課",
+                "利用下課準備下個科目與文具用品",
+                "提早上廁所喝水",
+                "桌面淨空",
+                "準備考試、收拾位置、坐在位置上"
+            ]
+        };
+
+        // --- 設定視窗元件 ---
+        const SettingsModal = ({ isOpen, onClose, config, onSave, onReset }) => {
+            const [localConfig, setLocalConfig] = useState(config);
+            const [activeTab, setActiveTab] = useState('schedule');
+            const [editingDay, setEditingDay] = useState('day1');
+
+            useEffect(() => {
+                setLocalConfig(config);
+            }, [config, isOpen]);
+
+            if (!isOpen) return null;
+
+            const handleScheduleChange = (id, field, value) => {
+                const currentSchedule = localConfig.schedules[editingDay];
+                const newSchedule = currentSchedule.map(item => 
+                    item.id === id ? { ...item, [field]: value } : item
+                );
+                setLocalConfig({
+                    ...localConfig,
+                    schedules: { ...localConfig.schedules, [editingDay]: newSchedule }
+                });
+            };
+
+            const addScheduleItem = () => {
+                const newId = Date.now().toString();
+                const newSchedule = [...localConfig.schedules[editingDay], { 
+                    id: newId, type: 'exam', start: '12:00', end: '12:40', label: '新時段' 
+                }];
+                setLocalConfig({
+                    ...localConfig,
+                    schedules: { ...localConfig.schedules, [editingDay]: newSchedule }
+                });
+            };
+
+            const removeScheduleItem = (id) => {
+                const newSchedule = localConfig.schedules[editingDay].filter(item => item.id !== id);
+                setLocalConfig({
+                    ...localConfig,
+                    schedules: { ...localConfig.schedules, [editingDay]: newSchedule }
+                });
+            };
+
+            const handleMessageChange = (type, text) => {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                setLocalConfig({ ...localConfig, [type]: lines });
+            };
+
+            const handleSave = () => {
+                onSave(localConfig);
+                onClose();
+            };
+
+            const handleReset = () => {
+                if(confirm('確定要恢復所有設定為預設值嗎？這將清除目前的自訂資料。')) {
+                    onReset();
+                    onClose();
+                }
+            };
+
+            const currentEditingList = localConfig.schedules[editingDay];
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+                        <div className="bg-gray-800 text-white px-6 py-4 flex justify-between items-center">
+                            <h2 className="text-2xl font-bold flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                                系統設定
+                            </h2>
+                            <button onClick={onClose} className="text-gray-300 hover:text-white">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                        </div>
+
+                        <div className="flex border-b border-gray-200 bg-gray-50">
+                            <button 
+                                onClick={() => { setActiveTab('schedule'); setEditingDay('day1'); }}
+                                className={`px-6 py-3 font-medium text-sm focus:outline-none transition-colors ${activeTab === 'schedule' ? 'border-b-2 border-blue-500 text-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                時間表設定
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('messages')}
+                                className={`px-6 py-3 font-medium text-sm focus:outline-none transition-colors ${activeTab === 'messages' ? 'border-b-2 border-blue-500 text-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                提醒訊息設定
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 custom-scroll bg-gray-50">
+                            {activeTab === 'schedule' && (
+                                <div className="space-y-4">
+                                    <div className="bg-white p-1 rounded-lg inline-flex shadow-sm border border-gray-200 mb-4">
+                                        <button 
+                                            onClick={() => setEditingDay('day1')}
+                                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${editingDay === 'day1' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                                        >
+                                            第 1 天設定
+                                        </button>
+                                        <button 
+                                            onClick={() => setEditingDay('day2')}
+                                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${editingDay === 'day2' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                                        >
+                                            第 2 天設定
+                                        </button>
+                                    </div>
+
+                                    <div className="flex justify-between items-center mb-4">
+                                        <p className="text-gray-600 text-sm">請設定 <span className="font-bold text-blue-600">{editingDay === 'day1' ? '第 1 天' : '第 2 天'}</span> 的考試與休息時段。</p>
+                                        <button onClick={addScheduleItem} className="btn-active bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                            新增時段
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-12 gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-2">
+                                        <div className="col-span-2">開始</div>
+                                        <div className="col-span-2">結束</div>
+                                        <div className="col-span-2">類型</div>
+                                        <div className="col-span-5">名稱/科目</div>
+                                        <div className="col-span-1 text-center">操作</div>
+                                    </div>
+
+                                    {currentEditingList.sort((a,b) => a.start.localeCompare(b.start)).map((item) => (
+                                        <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-white p-2 rounded shadow-sm border border-gray-100">
+                                            <div className="col-span-2">
+                                                <input type="time" value={item.start} onChange={(e) => handleScheduleChange(item.id, 'start', e.target.value)} className="w-full border rounded px-1 py-1 text-sm" />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <input type="time" value={item.end} onChange={(e) => handleScheduleChange(item.id, 'end', e.target.value)} className="w-full border rounded px-1 py-1 text-sm" />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <select value={item.type} onChange={(e) => handleScheduleChange(item.id, 'type', e.target.value)} className={`w-full border rounded px-1 py-1 text-sm ${item.type === 'exam' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                                    <option value="exam">考試</option>
+                                                    <option value="break">休息/準備</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-span-5">
+                                                <input type="text" value={item.label} onChange={(e) => handleScheduleChange(item.id, 'label', e.target.value)} className="w-full border rounded px-2 py-1 text-sm focus:border-blue-500 outline-none" />
+                                            </div>
+                                            <div className="col-span-1 text-center">
+                                                <button onClick={() => removeScheduleItem(item.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {activeTab === 'messages' && (
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">考試期間提醒訊息 (每天共用)</label>
+                                        <textarea className="w-full h-40 p-3 border rounded-lg text-sm focus:border-blue-500 outline-none leading-relaxed" value={localConfig.examMessages.join('\n')} onChange={(e) => handleMessageChange('examMessages', e.target.value)}></textarea>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">休息期間提醒訊息 (每天共用)</label>
+                                        <textarea className="w-full h-40 p-3 border rounded-lg text-sm focus:border-blue-500 outline-none leading-relaxed" value={localConfig.breakMessages.join('\n')} onChange={(e) => handleMessageChange('breakMessages', e.target.value)}></textarea>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-gray-100 px-6 py-4 flex justify-between items-center border-t border-gray-200">
+                            <button onClick={handleReset} className="text-red-600 text-sm hover:underline">恢復預設值</button>
+                            <div className="flex gap-3">
+                                <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50">取消</button>
+                                <button onClick={handleSave} className="btn-active px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow">儲存設定</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 主程式 ---
+        const App = () => {
+            // --- 狀態管理 ---
+            const [currentDay, setCurrentDay] = useState(() => {
+                const saved = localStorage.getItem('exam_board_current_day');
+                return saved || 'day1';
+            });
+
+            const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+            const [config, setConfig] = useState(() => {
+                const saved = localStorage.getItem('exam_board_config_v2');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (parsed.schedules && parsed.schedules.day1) return parsed;
+                    } catch(e) {}
+                }
+                return DEFAULT_CONFIG;
+            });
+
+            const [now, setNow] = useState(new Date());
+            const [offset, setOffset] = useState(() => {
+                const saved = localStorage.getItem('exam_clock_offset');
+                return saved ? parseInt(saved, 10) : 0;
+            });
+
+            const [audioTracks, setAudioTracks] = useState([]);
+            const audioRefs = useRef([]);
+            const fileInputRefs = useRef([]);
+
+            const [examData, setExamData] = useState(() => {
+                const saved = localStorage.getItem('exam_data_v2');
+                const base = {
+                    day1: { subjects: [], shouldArrive: "", actualArrive: "", absentList: "" },
+                    day2: { subjects: [], shouldArrive: "", actualArrive: "", absentList: "" }
+                };
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        return { ...base, ...parsed };
+                    } catch(e) {}
+                }
+                const initSubjects = (dayKey) => config.schedules[dayKey].filter(s => s.type === 'exam').map(s => s.label);
+                return {
+                    day1: { ...base.day1, subjects: initSubjects('day1') },
+                    day2: { ...base.day2, subjects: initSubjects('day2') }
+                };
+            });
+
+            // --- Effects ---
+            useEffect(() => { localStorage.setItem('exam_board_current_day', currentDay); }, [currentDay]);
+            useEffect(() => { localStorage.setItem('exam_board_config_v2', JSON.stringify(config)); }, [config]);
+            useEffect(() => { localStorage.setItem('exam_clock_offset', offset); }, [offset]);
+            useEffect(() => { localStorage.setItem('exam_data_v2', JSON.stringify(examData)); }, [examData]);
+
+            useEffect(() => {
+                ['day1', 'day2'].forEach(dayKey => {
+                    const examSlots = config.schedules[dayKey].filter(s => s.type === 'exam');
+                    const currentSubjects = examData[dayKey].subjects;
+                    const targetCount = examSlots.length;
+                    if (currentSubjects.length !== targetCount) {
+                        setExamData(prev => {
+                            const newSubjects = [...prev[dayKey].subjects];
+                            if (targetCount > currentSubjects.length) {
+                                for (let i = currentSubjects.length; i < targetCount; i++) newSubjects.push(examSlots[i].label);
+                            } else if (targetCount < currentSubjects.length) {
+                                newSubjects.length = targetCount;
+                            }
+                            return { ...prev, [dayKey]: { ...prev[dayKey], subjects: newSubjects } };
+                        });
+                    }
+                });
+            }, [config.schedules]);
+
+            useEffect(() => {
+                const examCount = config.schedules[currentDay].filter(s => s.type === 'exam').length;
+                setAudioTracks(prev => {
+                    const newTracks = [...prev];
+                    while(newTracks.length < examCount) newTracks.push({ src: null, fileName: "", isPlaying: false, progress: 0 });
+                    return newTracks;
+                });
+            }, [currentDay, config.schedules]);
+
+            useEffect(() => { const timer = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(timer); }, []);
+
+            // --- 計算邏輯 ---
+            const adjustedNow = useMemo(() => new Date(now.getTime() + offset), [now, offset]);
+            const daySchedule = config.schedules[currentDay];
+
+            const currentSlot = useMemo(() => {
+                const currentMs = adjustedNow.getHours() * 3600000 + adjustedNow.getMinutes() * 60000 + adjustedNow.getSeconds() * 1000;
+                const sortedSchedule = [...daySchedule].sort((a,b) => a.start.localeCompare(b.start));
+                for (let slot of sortedSchedule) {
+                    const [sh, sm] = slot.start.split(':').map(Number);
+                    const startMs = sh * 3600000 + sm * 60000;
+                    const [eh, em] = slot.end.split(':').map(Number);
+                    const endMs = eh * 3600000 + em * 60000;
+                    if (currentMs >= startMs && currentMs < endMs) {
+                        return { ...slot, startMs, endMs, durationMs: endMs - startMs };
+                    }
+                }
+                return null;
+            }, [adjustedNow, daySchedule]);
+
+            const reminderMessage = useMemo(() => {
+                if (!currentSlot) return "非考試/準備時段";
+                const currentMs = adjustedNow.getHours() * 3600000 + adjustedNow.getMinutes() * 60000 + adjustedNow.getSeconds() * 1000;
+                const elapsedMinutes = Math.floor((currentMs - currentSlot.startMs) / 60000);
+                let messages = currentSlot.type === 'exam' ? config.examMessages : config.breakMessages;
+                let interval = currentSlot.type === 'exam' ? 5 : (currentSlot.durationMs / 60000 >= 20 ? 4 : 2);
+                if (messages.length === 0) return "無設定訊息";
+                return messages[Math.floor(elapsedMinutes / interval) % messages.length];
+            }, [adjustedNow, currentSlot, config]);
+
+            const progressInfo = useMemo(() => {
+                if (!currentSlot) return { remainingPercent: 0, color: 'stroke-gray-300', text: '等待中' };
+                const currentMs = adjustedNow.getHours() * 3600000 + adjustedNow.getMinutes() * 60000 + adjustedNow.getSeconds() * 1000;
+                const progressMs = currentMs - currentSlot.startMs;
+                const totalMs = currentSlot.durationMs;
+                const remainingMs = totalMs - progressMs;
+                const elapsedPercent = Math.min(100, Math.max(0, (progressMs / totalMs) * 100));
+                const remainingPercent = 100 - elapsedPercent;
+
+                let colorClass = 'stroke-green-500', statusText = "";
+                if (currentSlot.type === 'exam') {
+                    statusText = "考試開始";
+                    if (remainingMs <= totalMs / 2) { colorClass = 'stroke-yellow-400'; statusText = "考試時間剩下一半"; }
+                    if (remainingMs <= 10 * 60000) { colorClass = 'stroke-red-500'; statusText = "考試時間不到10分鐘"; }
+                } else {
+                    if (remainingMs > 5 * 60000) { colorClass = 'stroke-green-500'; statusText = "休息時間"; }
+                    else if (remainingMs > 3 * 60000) { colorClass = 'stroke-yellow-400'; statusText = "快去上廁所喝水"; }
+                    else { colorClass = 'stroke-red-500'; statusText = "請收拾東西在座位上坐好"; }
+                }
+                return { remainingPercent, color: colorClass, text: statusText };
+            }, [adjustedNow, currentSlot]);
+
+            // --- UI 操作函式 ---
+            const handleInputChange = (field, value) => setExamData(prev => ({ ...prev, [currentDay]: { ...prev[currentDay], [field]: value } }));
+            const handleSubjectChange = (index, value) => setExamData(prev => {
+                const newSubjects = [...prev[currentDay].subjects];
+                newSubjects[index] = value;
+                return { ...prev, [currentDay]: { ...prev[currentDay], subjects: newSubjects } };
+            });
+            const adjustTime = (seconds) => setOffset(prev => prev + (seconds * 1000));
+
+            const handleFileSelect = (index, e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const url = URL.createObjectURL(file);
+                    setAudioTracks(prev => {
+                        const newTracks = [...prev];
+                        while(newTracks.length <= index) newTracks.push({ src: null, fileName: "", isPlaying: false, progress: 0 });
+                        if (newTracks[index].src) URL.revokeObjectURL(newTracks[index].src);
+                        newTracks[index] = { src: url, fileName: file.name, isPlaying: false, progress: 0 };
+                        return newTracks;
+                    });
+                }
+            };
+
+            const togglePlay = (index) => {
+                const audioEl = audioRefs.current[index];
+                if (!audioEl) return;
+                setAudioTracks(prev => {
+                    while(prev.length <= index) prev.push({ src: null, fileName: "", isPlaying: false, progress: 0 });
+                    const newTracks = [...prev];
+                    const isNowPlaying = !newTracks[index].isPlaying;
+                    if (isNowPlaying) {
+                        newTracks.forEach((track, i) => { if (i !== index && track.isPlaying) { if (audioRefs.current[i]) audioRefs.current[i].pause(); track.isPlaying = false; } });
+                        audioEl.play();
+                    } else {
+                        audioEl.pause();
+                    }
+                    newTracks[index].isPlaying = isNowPlaying;
+                    return newTracks;
+                });
+            };
+
+            const replayAudio = (index) => {
+                const audioEl = audioRefs.current[index];
+                if (!audioEl) return;
+                audioEl.currentTime = 0;
+                audioEl.play();
+                setAudioTracks(prev => {
+                    while(prev.length <= index) prev.push({ src: null, fileName: "", isPlaying: false, progress: 0 });
+                    const newTracks = [...prev];
+                    newTracks.forEach((track, i) => { if (i !== index && track.isPlaying) { if (audioRefs.current[i]) audioRefs.current[i].pause(); track.isPlaying = false; } });
+                    newTracks[index].isPlaying = true;
+                    return newTracks;
+                });
+            };
+
+            const handleAudioEnded = (index) => setAudioTracks(prev => {
+                while(prev.length <= index) prev.push({ src: null, fileName: "", isPlaying: false, progress: 0 });
+                const newTracks = [...prev];
+                newTracks[index].isPlaying = false; newTracks[index].progress = 0;
+                return newTracks;
+            });
+
+            const handleTimeUpdate = (index, e) => {
+                const current = e.target.currentTime;
+                const duration = e.target.duration;
+                const percent = (duration > 0) ? (current / duration) * 100 : 0;
+                setAudioTracks(prev => {
+                    while(prev.length <= index) prev.push({ src: null, fileName: "", isPlaying: false, progress: 0 });
+                    const newTracks = [...prev];
+                    newTracks[index] = { ...newTracks[index], progress: percent };
+                    return newTracks;
+                });
+            };
+
+            const saveConfig = (newConfig) => setConfig(newConfig);
+            const resetConfig = () => { setConfig(DEFAULT_CONFIG); localStorage.removeItem('exam_board_config_v2'); };
+
+            const formatTime = (date) => {
+                const h = String(date.getHours()).padStart(2, '0');
+                const m = String(date.getMinutes()).padStart(2, '0');
+                const s = String(date.getSeconds()).padStart(2, '0');
+                return `${h}:${m}:${s}`;
+            };
+
+            const examSlots = useMemo(() => daySchedule.filter(s => s.type === 'exam'), [daySchedule]);
+            const currentDayData = examData[currentDay];
+
+            return (
+                <div className="flex flex-col h-screen w-screen overflow-hidden text-gray-800">
+                    
+                    <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} config={config} onSave={saveConfig} onReset={resetConfig} />
+
+                    {/* === C區 (上方 1/3) === */}
+                    <div className="h-[33vh] w-full bg-white border-b-4 border-gray-300 flex flex-row relative shadow-lg z-10">
+                        
+                        {/* 設定按鈕 (右上角 - 保持原位) */}
+                        <button onClick={() => setIsSettingsOpen(true)} className="absolute top-4 right-4 z-40 p-2 bg-white rounded-full shadow border border-gray-200 hover:bg-gray-50 text-gray-600 transition-all hover:rotate-90 duration-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+
+                        {/* 左側 1/3: 系統時間 (整合 Day Switcher) */}
+                        <div className="w-1/3 flex flex-col items-center justify-center border-r border-gray-200 bg-gray-50 relative group px-4 py-2">
+                            
+                            {/* Day Switcher (移至此處，作為標籤) */}
+                            <div className="w-full flex justify-center gap-2 mb-2">
+                                <button onClick={() => setCurrentDay('day1')} className={`flex-1 py-1 text-sm font-bold rounded border transition-colors ${currentDay === 'day1' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'}`}>
+                                    第 1 天
+                                </button>
+                                <button onClick={() => setCurrentDay('day2')} className={`flex-1 py-1 text-sm font-bold rounded border transition-colors ${currentDay === 'day2' ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'}`}>
+                                    第 2 天
+                                </button>
+                            </div>
+
+                            <div className="text-[1.2vw] text-gray-500 font-bold mb-1 tracking-widest">現在時間</div>
+                            <div className="text-[5.5vw] font-black leading-none text-gray-800 tabular-nums tracking-tighter mb-2">
+                                {formatTime(adjustedNow)}
+                            </div>
+                            
+                            {/* 微調按鈕群組 */}
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 opacity-20 group-hover:opacity-100 transition-opacity w-full max-w-[240px]">
+                                <div className="flex justify-between items-center gap-1">
+                                    <button onClick={() => adjustTime(-60)} className="btn-active flex-1 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300">-1分</button>
+                                    <button onClick={() => adjustTime(60)} className="btn-active flex-1 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300">+1分</button>
+                                </div>
+                                <div className="flex justify-between items-center gap-1">
+                                    <button onClick={() => adjustTime(-1)} className="btn-active flex-1 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300">-1秒</button>
+                                    <button onClick={() => adjustTime(1)} className="btn-active flex-1 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300">+1秒</button>
+                                </div>
+                                <div className="col-span-2 flex justify-center gap-2 mt-1">
+                                    <button onClick={() => adjustTime(-30)} className="btn-active w-1/3 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300">-30秒</button>
+                                    <button onClick={() => adjustTime(30)} className="btn-active w-1/3 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300">+30秒</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 右側 2/3: 進度條區塊 (回歸乾淨版面) */}
+                        <div className="w-2/3 flex flex-col relative bg-gray-100 items-center justify-center p-4">
+                            <div className="absolute inset-0 flex items-center justify-center z-10">
+                                <span className="text-[3.5vw] font-bold text-gray-500 opacity-60 select-none whitespace-nowrap drop-shadow-sm">
+                                    {progressInfo.text}
+                                </span>
+                            </div>
+                            
+                            <svg className="w-full h-full max-h-[80%]" viewBox="0 0 300 50" preserveAspectRatio="xMidYMid meet">
+                                <rect x="5" y="5" width="290" height="40" rx="20" ry="20" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                                <rect 
+                                    x="5" y="5" width="290" height="40" rx="20" ry="20" 
+                                    fill="none" 
+                                    className={`track-transition ${progressInfo.color}`}
+                                    strokeWidth="8"
+                                    pathLength="100"
+                                    strokeDasharray="100"
+                                    strokeDashoffset={100 - progressInfo.remainingPercent}
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                        </div>
+                    </div>
+
+                    {/* === 下方區塊容器 (A + B) === */}
+                    <div className="flex-1 flex flex-row h-[67vh]">
+                        
+                        {/* === A區 (左側 1/2) === */}
+                        <div className="w-1/2 flex flex-col border-r-4 border-gray-300 bg-white overflow-hidden">
+                            <div className="h-2/3 flex flex-col border-b-2 border-dashed border-gray-300">
+                                {examSlots.map((slot, index) => {
+                                    const isActive = currentSlot && currentSlot.id === slot.id;
+                                    return (
+                                        <div key={slot.id} className={`flex-1 flex items-center gap-2 border-b border-gray-100 last:border-0 px-4 transition-colors duration-300 ${isActive ? 'bg-yellow-300' : ''}`}>
+                                            <div className="flex-1">
+                                                <input type="text" value={currentDayData.subjects[index] || ""} onChange={(e) => handleSubjectChange(index, e.target.value)} className="w-full text-[2.8vw] font-black bg-transparent border-b border-transparent hover:border-gray-200 focus:border-blue-500 outline-none placeholder-gray-300 leading-tight text-black" placeholder="科目" />
+                                            </div>
+                                            <div className="text-[3vw] font-black whitespace-nowrap text-black font-sans tracking-tight">{slot.start}~{slot.end}</div>
+                                            <div className="flex flex-col items-end justify-center gap-1 w-[22%] relative">
+                                                <input type="file" accept="audio/*" ref={el => fileInputRefs.current[index] = el} onChange={(e) => handleFileSelect(index, e)} className="hidden-input" />
+                                                <div className="flex gap-1 w-full justify-end items-center">
+                                                    <button onClick={() => fileInputRefs.current[index].click()} className="btn-active p-1 bg-gray-100 text-gray-500 rounded hover:bg-gray-200 transition-colors h-8 w-8 flex items-center justify-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                                    </button>
+                                                    {audioTracks[index]?.src && (
+                                                        <button onClick={() => togglePlay(index)} className={`btn-active px-2 rounded text-white text-xs font-bold shadow flex items-center justify-center transition-colors h-8 min-w-[3.5rem] ${audioTracks[index].isPlaying ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
+                                                            {audioTracks[index].isPlaying ? '暫停' : '播放'}
+                                                        </button>
+                                                    )}
+                                                    {audioTracks[index]?.src && (
+                                                        <button onClick={() => replayAudio(index)} className="btn-active p-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors h-8 w-8 flex items-center justify-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {audioTracks[index]?.src && (
+                                                    <div className="w-full h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                                                        <div className="h-full bg-blue-500 transition-all duration-200 ease-linear" style={{ width: `${audioTracks[index].progress}%` }}></div>
+                                                    </div>
+                                                )}
+                                                <audio ref={el => audioRefs.current[index] = el} src={audioTracks[index]?.src || undefined} onEnded={() => handleAudioEnded(index)} onTimeUpdate={(e) => handleTimeUpdate(index, e)} hidden />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="h-1/3 flex flex-row bg-blue-50">
+                                <div className="flex-1 flex flex-col items-center justify-center border-r border-blue-200 p-2">
+                                    <span className="text-[1.5vw] font-bold text-blue-800">應到</span>
+                                    <input type="number" value={currentDayData.shouldArrive} onChange={(e) => handleInputChange('shouldArrive', e.target.value)} className="w-full text-center bg-transparent text-[4vw] font-bold text-blue-900 outline-none" placeholder="0" />
+                                </div>
+                                <div className="flex-1 flex flex-col items-center justify-center border-r border-blue-200 p-2">
+                                    <span className="text-[1.5vw] font-bold text-green-800">實到</span>
+                                    <input type="number" value={currentDayData.actualArrive} onChange={(e) => handleInputChange('actualArrive', e.target.value)} className="w-full text-center bg-transparent text-[4vw] font-bold text-green-900 outline-none" placeholder="0" />
+                                </div>
+                                <div className="flex-[1.5] flex flex-col items-center justify-center p-2">
+                                    <span className="text-[1.5vw] font-bold text-red-800">未到座號/姓名</span>
+                                    <textarea value={currentDayData.absentList} onChange={(e) => handleInputChange('absentList', e.target.value)} className="w-full h-full text-center bg-transparent text-[2vw] font-bold text-red-600 outline-none resize-none pt-2 leading-tight" placeholder="點擊輸入" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* === B區 (右側 1/2) === */}
+                        <div className="w-1/2 bg-[#fffdf0] flex flex-col relative overflow-hidden">
+                            <div className="absolute top-0 left-0 bg-yellow-400 text-yellow-900 px-4 py-2 text-xl font-bold rounded-br-lg z-20">提醒事項</div>
+                            <div className="flex-1 flex items-center justify-center p-12">
+                                <div className="text-[5vw] font-bold text-center leading-snug text-gray-800 animate-fade-in">{reminderMessage}</div>
+                            </div>
+                            <div className="h-4 bg-stripes w-full"></div>
+                        </div>
+                    </div>
+                    
+                    <style>{`
+                        .bg-stripes {
+                            background-image: linear-gradient(45deg, #fbbf24 25%, transparent 25%, transparent 50%, #fbbf24 50%, #fbbf24 75%, transparent 75%, transparent);
+                            background-size: 20px 20px;
+                        }
+                        @keyframes fadeIn {
+                            from { opacity: 0; transform: translateY(10px); }
+                            to { opacity: 1; transform: translateY(0); }
+                        }
+                        .animate-fade-in {
+                            animation: fadeIn 0.5s ease-out forwards;
+                        }
+                    `}</style>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
