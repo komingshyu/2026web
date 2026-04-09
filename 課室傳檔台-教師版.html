@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>課室傳檔台 - 教師版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root{--accent:#059669;--accent-l:#D1FAE5;--bg:#F5F4F0;--card:#FFF;--border:#E8E6E1;--fg:#1A1A1A;--muted:#9CA3AF}
+        *{font-family:'Noto Sans TC',sans-serif;box-sizing:border-box}
+        body{background:var(--bg);color:var(--fg);margin:0}
+        .screen{display:none;flex-direction:column;min-height:100vh}
+        .screen.active{display:flex}
+        .student-chip{transition:all .2s ease;animation:chipIn .35s cubic-bezier(.34,1.56,.64,1) both}
+        @keyframes chipIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+        .student-chip.sel{background:var(--accent);color:#fff;border-color:var(--accent)}
+        .progress-fill{transition:width .15s ease;background:linear-gradient(90deg,#059669,#34D399)}
+        .toast{animation:toastIn .4s cubic-bezier(.34,1.56,.64,1)}
+        .toast.out{animation:toastOut .3s ease forwards}
+        @keyframes toastIn{from{transform:translateY(20px) scale(.9);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+        @keyframes toastOut{to{transform:translateY(-20px) scale(.9);opacity:0}}
+        .file-item{animation:fileSlide .3s ease both}
+        @keyframes fileSlide{from{transform:translateX(-12px);opacity:0}to{transform:translateX(0);opacity:1}}
+        .drop-zone{transition:all .2s ease}
+        .drop-zone.over{border-color:var(--accent)!important;background:var(--accent-l)!important}
+        .room-code{font-family:'Courier New',monospace;letter-spacing:.35em;font-weight:900}
+        .cscroll::-webkit-scrollbar{width:4px}
+        .cscroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+        .cscroll::-webkit-scrollbar-track{background:transparent}
+        .pulse-dot{animation:pDot 2s ease infinite}
+        @keyframes pDot{0%,100%{opacity:1}50%{opacity:.25}}
+        .bg-deco{background-image:radial-gradient(circle at 15% 85%,rgba(5,150,105,.07) 0%,transparent 50%),radial-gradient(circle at 85% 15%,rgba(5,150,105,.05) 0%,transparent 50%)}
+        .send-progress-item{animation:fadeUp .3s ease both}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .dir-bar{background:linear-gradient(135deg,#ECFDF5 0%,#F0FDF4 100%);border:1.5px dashed #059669}
+        .dir-bar.active{border-style:solid;background:linear-gradient(135deg,#D1FAE5 0%,#ECFDF5 100%)}
+        .dir-bar .dir-icon{transition:all .3s ease}
+        .dir-bar.active .dir-icon{color:#059669;transform:scale(1.1)}
+    </style>
+</head>
+<body>
+    <!-- 開啟教室畫面 -->
+    <div id="setup-screen" class="screen active items-center justify-center p-4 bg-deco">
+        <div class="w-full max-w-md space-y-6">
+            <div class="text-center space-y-3">
+                <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-emerald-200/50">
+                    <i class="fas fa-chalkboard-user text-white text-2xl"></i>
+                </div>
+                <h1 class="text-3xl font-black tracking-tight">上課作業上傳檔案室</h1>
+                <p class="text-sm" style="color:var(--muted)">教師版 — 建立教室，接收與發送檔案</p>
+            </div>
+            <div class="bg-white p-8 rounded-3xl shadow-sm space-y-5 border" style="border-color:var(--border)">
+                <div>
+                    <label class="text-[10px] font-bold uppercase tracking-widest ml-1" style="color:var(--muted)">教師姓名</label>
+                    <input type="text" id="input-name" placeholder="輸入教師姓名" maxlength="12"
+                        class="w-full mt-1 p-4 rounded-2xl outline-none font-bold focus:ring-2 focus:ring-emerald-400 transition-all" style="background:var(--bg);border:none">
+                </div>
+                <button onclick="initTeacher()" id="start-btn" class="w-full font-bold py-4 rounded-2xl text-white transition-all active:scale-95 shadow-lg shadow-emerald-100" style="background:var(--accent)">
+                    <i class="fas fa-door-open mr-2"></i>開啟教室
+                </button>
+            </div>
+            <p class="text-[10px] text-center" style="color:var(--muted)">Made by <a href="https://kentxchang.blogspot.tw" target="_blank" class="underline">阿剛老師</a> koming修改· CC BY-NC-SA 4.0</p>
+        </div>
+    </div>
+
+    <!-- 教師主畫面 -->
+    <div id="main-screen" class="screen p-4">
+        <div class="max-w-lg mx-auto w-full flex-1 flex flex-col gap-4 py-2">
+            <header class="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between" style="border-color:var(--border)">
+                <div>
+                    <div class="text-xs font-medium" style="color:var(--muted)">教室代碼</div>
+                    <div class="room-code text-2xl mt-1" style="color:var(--accent)" id="room-code">------</div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="copyCode()" class="p-3 rounded-xl transition-colors hover:bg-slate-100" title="複製代碼">
+                        <i class="fas fa-copy" style="color:var(--muted)"></i>
+                    </button>
+                    <div class="text-right">
+                        <div class="flex items-center gap-1.5 justify-end">
+                            <span class="w-2 h-2 rounded-full pulse-dot" style="background:var(--accent)"></span>
+                            <span class="text-xs font-bold" style="color:var(--accent)">已開啟</span>
+                        </div>
+                        <div class="text-xs mt-0.5" style="color:var(--muted)"><span id="stu-count">0</span> 位學生在線</div>
+                    </div>
+                </div>
+            </header>
+
+            <section class="bg-white rounded-2xl p-4 shadow-sm border" style="border-color:var(--border)">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-bold uppercase tracking-widest" style="color:var(--muted)">學生列表</span>
+                    <label class="flex items-center gap-2 cursor-pointer text-xs font-medium" style="color:var(--accent)">
+                        <input type="checkbox" id="chk-all" checked onchange="toggleAll(this.checked)" class="accent-emerald-600 w-4 h-4 rounded">
+                        全選
+                    </label>
+                </div>
+                <div id="stu-list" class="flex flex-wrap gap-2 min-h-[40px] items-center cscroll max-h-32 overflow-y-auto">
+                    <div class="text-xs italic" style="color:var(--border)">等待學生加入...</div>
+                </div>
+            </section>
+
+            <div id="dir-bar" class="dir-bar rounded-2xl p-4 cursor-pointer" onclick="setDirectory()">
+                <div class="flex items-center gap-3">
+                    <div class="dir-icon w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,.7)">
+                        <i class="fas fa-folder-open text-xl" style="color:var(--border)"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold" id="dir-title">點擊設定自動存檔資料夾</div>
+                        <div class="text-[10px] mt-0.5 truncate" style="color:var(--muted)" id="dir-desc">學生上傳的檔案會自動存入此資料夾（需 Chrome / Edge）</div>
+                    </div>
+                    <div class="flex-shrink-0 flex items-center gap-2">
+                        <span id="dir-badge" class="hidden text-[10px] font-bold px-2.5 py-1 rounded-full" style="background:var(--accent);color:#fff"><i class="fas fa-check mr-1"></i>已設定</span>
+                        <i id="dir-arrow" class="fas fa-chevron-right text-xs" style="color:var(--border)"></i>
+                    </div>
+                </div>
+            </div>
+
+            <section class="bg-white rounded-2xl p-4 shadow-sm border space-y-3" style="border-color:var(--border)">
+                <div class="text-xs font-bold uppercase tracking-widest" style="color:var(--muted)">發送檔案給學生</div>
+                <label id="drop-zone" class="drop-zone block p-6 rounded-2xl border-2 border-dashed text-center cursor-pointer" style="border-color:var(--border);background:var(--bg)">
+                    <i class="fas fa-cloud-arrow-up text-3xl mb-2" style="color:var(--border)"></i>
+                    <div class="text-sm font-medium" style="color:var(--muted)" id="file-label">拖放檔案至此，或點擊選擇</div>
+                    <input type="file" id="file-input" class="hidden" onchange="handleFile(this.files)">
+                </label>
+                <button onclick="teacherSend()" id="send-btn" disabled class="w-full font-bold py-3.5 rounded-2xl text-white transition-all active:scale-95 disabled:opacity-40" style="background:var(--accent)">
+                    <i class="fas fa-paper-plane mr-2"></i><span id="send-text">選擇檔案後發送</span>
+                </button>
+            </section>
+
+            <div id="progress-area" class="hidden space-y-2"></div>
+
+            <section class="bg-white rounded-2xl p-4 shadow-sm border flex-1" style="border-color:var(--border)">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-bold uppercase tracking-widest" style="color:var(--muted)">已接收檔案</span>
+                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" style="background:var(--bg);color:var(--muted)" id="recv-count">0 份</span>
+                </div>
+                <div id="recv-list" class="space-y-2 cscroll max-h-60 overflow-y-auto">
+                    <div class="text-xs italic" style="color:var(--border)">尚未收到檔案</div>
+                </div>
+            </section>
+
+            <footer class="text-center py-3">
+                <button onclick="location.reload()" class="text-xs font-medium px-4 py-2 rounded-xl hover:bg-white transition-colors" style="color:var(--muted)">
+                    <i class="fas fa-xmark mr-1"></i>關閉教室
+                </button>
+            </footer>
+        </div>
+    </div>
+
+    <div id="toasts" class="fixed top-4 right-4 z-50 space-y-2" style="max-width:340px"></div>
+
+    <script>
+    var peer = null;
+    var myName = '';
+    var roomCode = '';
+    var connections = new Map();
+    var selectedStudents = new Set();
+    var selectAll = true;
+    var selectedFile = null;
+    var CHUNK = 65536;
+    var rxState = new Map();
+    var transferCounter = 0;
+    var targetDirHandle = null;
+    var dirSupported = false;
+    var receivedCount = 0;
+
+    /* ========== 工具函式 ========== */
+    function genCode() {
+        var c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = '';
+        for (var i = 0; i < 6; i++) s += c[Math.floor(Math.random() * c.length)];
+        return s;
+    }
+    function fmtSize(b) {
+        if (b < 1024) return b + ' B';
+        if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+        if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+        return (b / 1073741824).toFixed(2) + ' GB';
+    }
+    function fileIcon(name) {
+        var ext = (name.split('.').pop() || '').toLowerCase();
+        var m = {jpg:'fa-file-image',jpeg:'fa-file-image',png:'fa-file-image',gif:'fa-file-image',webp:'fa-file-image',svg:'fa-file-image',bmp:'fa-file-image',pdf:'fa-file-pdf',doc:'fa-file-word',docx:'fa-file-word',odt:'fa-file-word',xls:'fa-file-excel',xlsx:'fa-file-excel',csv:'fa-file-excel',ppt:'fa-file-powerpoint',pptx:'fa-file-powerpoint',zip:'fa-file-zipper',rar:'fa-file-zipper','7z':'fa-file-zipper',mp4:'fa-file-video',mov:'fa-file-video',avi:'fa-file-video',mkv:'fa-file-video',mp3:'fa-file-audio',wav:'fa-file-audio',ogg:'fa-file-audio',flac:'fa-file-audio',js:'fa-file-code',html:'fa-file-code',css:'fa-file-code',py:'fa-file-code',txt:'fa-file-lines',md:'fa-file-lines',json:'fa-file-lines'};
+        return m[ext] || 'fa-file';
+    }
+    function now() {
+        var d = new Date();
+        return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') + ':' + d.getSeconds().toString().padStart(2,'0');
+    }
+    function safeName(n) { return n.replace(/[\\/:*?"<>|]/g, '_'); }
+    function isBinaryChunk(d) { return d instanceof ArrayBuffer || d instanceof Uint8Array; }
+    function toUint8(d) {
+        if (d instanceof Uint8Array) return d;
+        if (d instanceof ArrayBuffer) return new Uint8Array(d);
+        return new Uint8Array(0);
+    }
+
+    /* ========== UI ========== */
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+        document.getElementById(id).classList.add('active');
+    }
+    function showToast(msg, type) {
+        type = type || 'info';
+        var box = document.getElementById('toasts');
+        var el = document.createElement('div');
+        var colors = {success:'background:#059669;color:#fff',error:'background:#DC2626;color:#fff',warning:'background:#D97706;color:#fff',info:'background:#1E293B;color:#fff'};
+        var icons = {success:'fa-circle-check',error:'fa-circle-xmark',warning:'fa-triangle-exclamation',info:'fa-circle-info'};
+        el.className = 'toast flex items-start gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium';
+        el.style.cssText = colors[type] || colors.info;
+        el.innerHTML = '<i class="fas ' + (icons[type]||icons.info) + ' mt-0.5"></i><span>' + msg + '</span>';
+        box.appendChild(el);
+        setTimeout(function() { el.classList.add('out'); setTimeout(function() { el.remove(); }, 300); }, 4000);
+    }
+    function copyCode() {
+        navigator.clipboard.writeText(roomCode).then(function() { showToast('教室代碼已複製', 'success'); });
+    }
+
+    function renderStudents() {
+        var box = document.getElementById('stu-list');
+        if (connections.size === 0) {
+            box.innerHTML = '<div class="text-xs italic" style="color:var(--border)">等待學生加入...</div>';
+            document.getElementById('stu-count').textContent = '0';
+            return;
+        }
+        document.getElementById('stu-count').textContent = connections.size;
+        box.innerHTML = '';
+        connections.forEach(function(val, pid) {
+            var chip = document.createElement('button');
+            chip.className = 'student-chip px-3 py-1.5 rounded-full text-xs font-bold border-2' + (selectedStudents.has(pid) ? ' sel' : '');
+            if (!selectedStudents.has(pid)) chip.style.cssText = 'border-color:var(--border);color:var(--fg);background:#fff';
+            chip.textContent = val.name;
+            chip.onclick = function() {
+                if (selectedStudents.has(pid)) selectedStudents.delete(pid); else selectedStudents.add(pid);
+                renderStudents(); updateSendBtn();
+            };
+            box.appendChild(chip);
+        });
+        updateSendBtn();
+    }
+    function toggleAll(checked) {
+        selectAll = checked;
+        if (checked) connections.forEach(function(_, pid) { selectedStudents.add(pid); }); else selectedStudents.clear();
+        renderStudents();
+    }
+    function updateSendBtn() {
+        var btn = document.getElementById('send-btn'), txt = document.getElementById('send-text');
+        if (!selectedFile) { btn.disabled = true; txt.textContent = '選擇檔案後發送'; return; }
+        var n = selectedStudents.size;
+        if (n === 0) { btn.disabled = true; txt.textContent = '請選擇至少一位學生'; return; }
+        btn.disabled = false;
+        txt.textContent = connections.size === n ? '發送給全部 ' + n + ' 位學生' : '發送給 ' + n + ' 位學生';
+    }
+
+    function addReceivedFile(name, size, from, blob, autoSaved, path) {
+        var box = document.getElementById('recv-list');
+        var ph = box.querySelector('.italic'); if (ph) ph.remove();
+        receivedCount++;
+        document.getElementById('recv-count').textContent = receivedCount + ' 份';
+        var el = document.createElement('div');
+        el.className = 'file-item flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors';
+        var infoExtra = autoSaved && path ? ' · <span style="color:var(--accent)"><i class="fas fa-folder"></i> ' + path + '</span>' : '';
+        var action = autoSaved
+            ? '<div class="flex items-center gap-1 text-[10px] font-bold flex-shrink-0 px-2.5 py-1.5 rounded-lg" style="background:var(--accent-l);color:var(--accent)"><i class="fas fa-check"></i> 已存檔</div>'
+            : '<a href="' + URL.createObjectURL(blob) + '" download="' + name + '" class="p-2 rounded-lg hover:bg-emerald-50 transition-colors flex-shrink-0" style="color:var(--accent)"><i class="fas fa-download"></i></a>';
+        el.innerHTML = '<div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:var(--accent-l)"><i class="fas ' + fileIcon(name) + '" style="color:var(--accent)"></i></div>'
+            + '<div class="flex-1 min-w-0"><div class="text-sm font-bold truncate">' + name + '</div><div class="text-[10px]" style="color:var(--muted)">' + fmtSize(size) + ' · 來自 ' + from + ' · ' + now() + infoExtra + '</div></div>'
+            + action;
+        box.prepend(el);
+    }
+
+    function showSendProg(tid, label) {
+        var area = document.getElementById('progress-area'); area.classList.remove('hidden');
+        var el = document.createElement('div'); el.id = 'prog-' + tid;
+        el.className = 'send-progress-item bg-white rounded-2xl p-4 shadow-sm border space-y-2'; el.style.borderColor = 'var(--border)';
+        el.innerHTML = '<div class="flex items-center justify-between"><span class="text-xs font-bold truncate">' + label + '</span><span class="text-[10px] font-mono" style="color:var(--muted)" id="pct-' + tid + '">0%</span></div><div class="w-full rounded-full h-2 overflow-hidden" style="background:var(--bg)"><div class="progress-fill h-full rounded-full" id="bar-' + tid + '" style="width:0%"></div></div>';
+        area.appendChild(el);
+    }
+    function updateSendProg(tid, pct) {
+        var b = document.getElementById('bar-' + tid), p = document.getElementById('pct-' + tid);
+        if (b) b.style.width = pct + '%'; if (p) p.textContent = Math.round(pct) + '%';
+    }
+    function finishSendProg(tid) {
+        updateSendProg(tid, 100);
+        setTimeout(function() {
+            var e = document.getElementById('prog-' + tid); if (e) e.remove();
+            var a = document.getElementById('progress-area'); if (a && a.children.length === 0) a.classList.add('hidden');
+        }, 2000);
+    }
+    function showRxProg(label) {
+        var area = document.getElementById('progress-area'); area.classList.remove('hidden');
+        var id = 'rx-' + Date.now();
+        var el = document.createElement('div'); el.id = id;
+        el.className = 'send-progress-item bg-white rounded-2xl p-4 shadow-sm border space-y-2'; el.style.borderColor = 'var(--border)';
+        el.innerHTML = '<div class="flex items-center justify-between"><span class="text-xs font-bold truncate" style="color:#D97706"><i class="fas fa-arrow-down mr-1.5"></i>' + label + '</span><span class="text-[10px] font-mono" style="color:var(--muted)" id="rpct-' + id + '">0%</span></div><div class="w-full rounded-full h-2 overflow-hidden" style="background:var(--bg)"><div class="h-full rounded-full" id="rbar-' + id + '" style="width:0%;background:linear-gradient(90deg,#D97706,#FBBF24);transition:width .15s ease"></div></div>';
+        area.appendChild(el);
+        return id;
+    }
+    function updateRxProg(id, pct) {
+        var b = document.getElementById('rbar-' + id), p = document.getElementById('rpct-' + id);
+        if (b) b.style.width = pct + '%'; if (p) p.textContent = Math.round(pct) + '%';
+    }
+    function finishRxProg(id) {
+        updateRxProg(id, 100);
+        setTimeout(function() {
+            var e = document.getElementById(id); if (e) e.remove();
+            var a = document.getElementById('progress-area'); if (a && a.children.length === 0) a.classList.add('hidden');
+        }, 1500);
+    }
+
+    /* ========== 檔案選擇 ========== */
+    function handleFile(files) {
+        if (!files || files.length === 0) return;
+        selectedFile = files[0];
+        document.getElementById('file-label').textContent = selectedFile.name + ' (' + fmtSize(selectedFile.size) + ')';
+        updateSendBtn();
+    }
+    function setupDrop() {
+        var el = document.getElementById('drop-zone');
+        el.addEventListener('dragover', function(e) { e.preventDefault(); el.classList.add('over'); });
+        el.addEventListener('dragleave', function() { el.classList.remove('over'); });
+        el.addEventListener('drop', function(e) { e.preventDefault(); el.classList.remove('over'); handleFile(e.dataTransfer.files); });
+    }
+
+    /* ========== 資料夾設定 ========== */
+    function initDirBar() {
+        dirSupported = !!(window.showDirectoryPicker);
+        var bar = document.getElementById('dir-bar');
+        if (!dirSupported) {
+            bar.style.opacity = '0.5'; bar.style.cursor = 'default';
+            document.getElementById('dir-title').textContent = '此瀏覽器不支援自動存檔';
+            document.getElementById('dir-desc').textContent = '請使用最新版 Chrome 或 Edge';
+            bar.onclick = null;
+        }
+    }
+    async function setDirectory() {
+        if (!dirSupported) return;
+        try {
+            targetDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            updateDirUI();
+            showToast('已設定資料夾：' + targetDirHandle.name, 'success');
+        } catch (err) {
+            if (err.name !== 'AbortError') showToast('無法存取資料夾', 'error');
+        }
+    }
+    function updateDirUI() {
+        var bar = document.getElementById('dir-bar');
+        if (targetDirHandle) {
+            bar.classList.add('active');
+            document.getElementById('dir-title').textContent = targetDirHandle.name;
+            document.getElementById('dir-desc').textContent = '學生上傳的檔案會自動存入 · 點擊變更';
+            document.getElementById('dir-badge').classList.remove('hidden');
+            document.getElementById('dir-arrow').style.display = 'none';
+        } else {
+            bar.classList.remove('active');
+            document.getElementById('dir-title').textContent = '點擊設定自動存檔資料夾';
+            document.getElementById('dir-desc').textContent = '學生上傳的檔案會自動存入此資料夾（需 Chrome / Edge）';
+            document.getElementById('dir-badge').classList.add('hidden');
+            document.getElementById('dir-arrow').style.display = '';
+        }
+    }
+    async function autoSave(blob, fileName, stuName) {
+        if (!targetDirHandle || !dirSupported) return false;
+        try {
+            var perm = await targetDirHandle.queryPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') {
+                try { perm = await targetDirHandle.requestPermission({ mode: 'readwrite' }); } catch (e) {
+                    targetDirHandle = null; updateDirUI();
+                    showToast('資料夾權限已過期，請重新設定', 'warning'); return false;
+                }
+                if (perm !== 'granted') { targetDirHandle = null; updateDirUI(); showToast('未取得寫入權限', 'warning'); return false; }
+            }
+            var finalName = safeName(stuName) + '_' + fileName;
+            var fh = await targetDirHandle.getFileHandle(finalName, { create: true });
+            var w = await fh.createWritable();
+            await w.write(blob); await w.close();
+            return true;
+        } catch (err) {
+            console.error('自動存檔失敗:', err);
+            targetDirHandle = null; updateDirUI();
+            showToast('自動存檔失敗，請重新設定資料夾', 'error'); return false;
+        }
+    }
+
+    /* ========== 教師端邏輯 ========== */
+    function initTeacher() {
+        myName = document.getElementById('input-name').value.trim();
+        if (!myName) { showToast('請輸入教師名稱', 'warning'); return; }
+        roomCode = genCode();
+        document.getElementById('room-code').textContent = roomCode;
+        var btn = document.getElementById('start-btn');
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>連線中...';
+        showScreen('main-screen');
+        initDirBar();
+
+        peer = new Peer('cls_' + roomCode);
+        peer.on('open', function() { showToast('教室已開啟，代碼：' + roomCode, 'success'); });
+        peer.on('connection', function(conn) {
+            conn.on('data', function(data) { handleData(conn, data); });
+            conn.on('close', function() {
+                var info = connections.get(conn.peer);
+                if (info) { showToast(info.name + ' 已離線', 'info'); connections.delete(conn.peer); selectedStudents.delete(conn.peer); renderStudents(); }
+            });
+            conn.on('error', function() { showToast('連線錯誤', 'error'); });
+        });
+        peer.on('error', function(err) {
+            if (err.type === 'unavailable-id') {
+                showToast('代碼衝突，重新產生中', 'warning');
+                roomCode = genCode(); document.getElementById('room-code').textContent = roomCode;
+                peer.destroy(); setTimeout(initTeacher, 500);
+            } else { showToast('錯誤：' + err.message, 'error'); }
+        });
+    }
+
+    async function handleData(conn, data) {
+        var pid = conn.peer;
+        if (data && data.type === 'join') {
+            connections.set(pid, { conn: conn, name: data.name });
+            if (selectAll) selectedStudents.add(pid);
+            renderStudents(); showToast(data.name + ' 已加入教室', 'success'); return;
+        }
+        if (data && data.type === 'file-start') {
+            rxState.set(pid, { meta: data, chunks: [], progEl: showRxProg('接收中：' + data.fileName) }); return;
+        }
+        if (isBinaryChunk(data)) {
+            var st = rxState.get(pid);
+            if (st) {
+                st.chunks.push(toUint8(data));
+                var r = 0; for (var i = 0; i < st.chunks.length; i++) r += st.chunks[i].byteLength;
+                updateRxProg(st.progEl, Math.min((r / st.meta.fileSize) * 100, 99));
+            }
+            return;
+        }
+        if (data && data.type === 'file-end') {
+            var st2 = rxState.get(pid);
+            if (st2) {
+                var blob = new Blob(st2.chunks, { type: 'application/octet-stream' });
+                var fn = st2.meta.fileName, sn = st2.meta.senderName;
+                finishRxProg(st2.progEl); rxState.delete(pid);
+                var saved = false, path = '';
+                if (targetDirHandle) { saved = await autoSave(blob, fn, sn); if (saved) path = targetDirHandle.name + '/' + safeName(sn) + '_' + fn; }
+                addReceivedFile(fn, st2.meta.fileSize, sn, blob, saved, path);
+                if (saved) showToast(sn + ' 的檔案已自動存入資料夾', 'success');
+                else if (targetDirHandle) showToast('自動存檔失敗，請手動下載', 'warning');
+                else showToast('已收到 ' + sn + ' 的檔案', 'success');
+            }
+            return;
+        }
+    }
+
+    function teacherSend() {
+        if (!selectedFile || selectedStudents.size === 0) return;
+        var tid = 'ts' + (++transferCounter), targets = [];
+        selectedStudents.forEach(function(pid) { targets.push(pid); });
+        showSendProg(tid, '傳送：' + selectedFile.name + ' → ' + targets.length + ' 位學生');
+        var done = 0, total = targets.length;
+        targets.forEach(function(pid) {
+            var info = connections.get(pid);
+            if (!info) { done++; chk(); return; }
+            sendToOne(info.conn, selectedFile, myName, function() { done++; updateSendProg(tid, (done / total) * 100); chk(); });
+        });
+        function chk() { if (done >= total) { finishSendProg(tid); showToast('已發送給 ' + total + ' 位學生', 'success'); clearFile(); } }
+    }
+
+    function sendToOne(conn, file, sender, onDone) {
+        conn.send({ type: 'file-start', fileName: file.name, fileSize: file.size, senderName: sender });
+        var reader = new FileReader(), offset = 0;
+        reader.onload = function(e) {
+            conn.send(new Uint8Array(e.target.result));
+            offset += e.target.result.byteLength;
+            if (offset < file.size) readNext(); else { conn.send({ type: 'file-end' }); onDone(); }
+        };
+        reader.onerror = function() { showToast('讀取檔案錯誤', 'error'); };
+        function readNext() { reader.readAsArrayBuffer(file.slice(offset, Math.min(offset + CHUNK, file.size))); }
+        readNext();
+    }
+
+    function clearFile() {
+        selectedFile = null;
+        document.getElementById('file-label').textContent = '拖放檔案至此，或點擊選擇';
+        document.getElementById('file-input').value = '';
+        updateSendBtn();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        setupDrop();
+        document.getElementById('input-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') initTeacher(); });
+    });
+    </script>
+</body>
+</html>

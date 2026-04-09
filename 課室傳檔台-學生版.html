@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>課室傳檔台 - 學生版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root{--warm:#D97706;--warm-l:#FEF3C7;--accent:#059669;--accent-l:#D1FAE5;--bg:#F5F4F0;--card:#FFF;--border:#E8E6E1;--fg:#1A1A1A;--muted:#9CA3AF}
+        *{font-family:'Noto Sans TC',sans-serif;box-sizing:border-box}
+        body{background:var(--bg);color:var(--fg);margin:0}
+        .screen{display:none;flex-direction:column;min-height:100vh}
+        .screen.active{display:flex}
+        .progress-fill{transition:width .15s ease;background:linear-gradient(90deg,#D97706,#FBBF24)}
+        .toast{animation:toastIn .4s cubic-bezier(.34,1.56,.64,1)}
+        .toast.out{animation:toastOut .3s ease forwards}
+        @keyframes toastIn{from{transform:translateY(20px) scale(.9);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+        @keyframes toastOut{to{transform:translateY(-20px) scale(.9);opacity:0}}
+        .file-item{animation:fileSlide .3s ease both}
+        @keyframes fileSlide{from{transform:translateX(-12px);opacity:0}to{transform:translateX(0);opacity:1}}
+        .drop-zone{transition:all .2s ease}
+        .drop-zone.over{border-color:var(--warm)!important;background:var(--warm-l)!important}
+        .room-code{font-family:'Courier New',monospace;letter-spacing:.35em;font-weight:900}
+        .cscroll::-webkit-scrollbar{width:4px}
+        .cscroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+        .cscroll::-webkit-scrollbar-track{background:transparent}
+        .pulse-dot{animation:pDot 2s ease infinite}
+        @keyframes pDot{0%,100%{opacity:1}50%{opacity:.25}}
+        .bg-deco{background-image:radial-gradient(circle at 15% 85%,rgba(217,119,6,.07) 0%,transparent 50%),radial-gradient(circle at 85% 15%,rgba(217,119,6,.05) 0%,transparent 50%)}
+        .send-progress-item{animation:fadeUp .3s ease both}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    </style>
+</head>
+<body>
+    <!-- 加入教室畫面 -->
+    <div id="setup-screen" class="screen active items-center justify-center p-4 bg-deco">
+        <div class="w-full max-w-md space-y-6">
+            <div class="text-center space-y-3">
+                <div class="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-amber-200/50">
+                    <i class="fas fa-user-graduate text-white text-2xl"></i>
+                </div>
+                <h1 class="text-3xl font-black tracking-tight">上課作業上傳檔案室</h1>
+                <p class="text-sm" style="color:var(--muted)">學生版 — 加入教室，傳檔給老師</p>
+            </div>
+            <div class="bg-white p-8 rounded-3xl shadow-sm space-y-5 border" style="border-color:var(--border)">
+                <div>
+                    <label class="text-[10px] font-bold uppercase tracking-widest ml-1" style="color:var(--muted)">學生姓名</label>
+                    <input type="text" id="input-name" placeholder="輸入班級座號姓名(13502陳小華)" maxlength="12"
+                        class="w-full mt-1 p-4 rounded-2xl outline-none font-bold focus:ring-2 focus:ring-amber-400 transition-all" style="background:var(--bg);border:none">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold uppercase tracking-widest ml-1" style="color:var(--muted)">教室代碼</label>
+                    <input type="text" id="input-room" placeholder="輸入老師提供的 6 位代碼" maxlength="6"
+                        class="w-full mt-1 p-4 rounded-2xl text-center font-bold text-xl uppercase outline-none focus:ring-2 focus:ring-amber-400 transition-all" style="background:var(--bg);border:none;font-family:'Courier New',monospace;letter-spacing:.3em">
+                </div>
+                <button onclick="joinRoom()" id="join-btn" class="w-full font-bold py-4 rounded-2xl text-white transition-all active:scale-95 shadow-lg shadow-amber-100" style="background:var(--warm)">
+                    <i class="fas fa-right-to-bracket mr-2"></i>加入教室
+                </button>
+            </div>
+            <p class="text-[10px] text-center" style="color:var(--muted)">Made by <a href="https://kentxchang.blogspot.tw" target="_blank" class="underline">阿剛老師</a> koming修改 · CC BY-NC-SA 4.0</p>
+        </div>
+    </div>
+
+    <!-- 學生主畫面 -->
+    <div id="main-screen" class="screen p-4">
+        <div class="max-w-lg mx-auto w-full flex-1 flex flex-col gap-4 py-2">
+            <header class="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between" style="border-color:var(--border)">
+                <div>
+                    <div class="text-xs font-medium" style="color:var(--muted)">已加入教室</div>
+                    <div class="room-code text-lg mt-1" style="color:var(--warm)" id="room-code">------</div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full pulse-dot" style="background:var(--accent)"></span>
+                    <span class="text-xs font-bold" style="color:var(--accent)">已連線</span>
+                </div>
+            </header>
+
+            <div class="bg-white rounded-2xl px-4 py-3 shadow-sm border flex items-center gap-3" style="border-color:var(--border)">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--warm-l)">
+                    <i class="fas fa-user text-sm" style="color:var(--warm)"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs" style="color:var(--muted)">身份</div>
+                    <div class="text-sm font-bold truncate" id="display-name">-</div>
+                </div>
+            </div>
+
+            <section class="bg-white rounded-2xl p-4 shadow-sm border space-y-3" style="border-color:var(--border)">
+                <div class="text-xs font-bold uppercase tracking-widest" style="color:var(--muted)">傳檔給老師</div>
+                <label id="drop-zone" class="drop-zone block p-6 rounded-2xl border-2 border-dashed text-center cursor-pointer" style="border-color:var(--border);background:var(--bg)">
+                    <i class="fas fa-cloud-arrow-up text-3xl mb-2" style="color:var(--border)"></i>
+                    <div class="text-sm font-medium" style="color:var(--muted)" id="file-label">拖放檔案至此，或點擊選擇</div>
+                    <input type="file" id="file-input" class="hidden" onchange="handleFile(this.files)">
+                </label>
+                <button onclick="studentSend()" id="send-btn" disabled class="w-full font-bold py-3.5 rounded-2xl text-white transition-all active:scale-95 disabled:opacity-40" style="background:var(--warm)">
+                    <i class="fas fa-paper-plane mr-2"></i>傳送給老師
+                </button>
+            </section>
+
+            <div id="progress-area" class="hidden space-y-2"></div>
+
+            <section class="bg-white rounded-2xl p-4 shadow-sm border flex-1" style="border-color:var(--border)">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-bold uppercase tracking-widest" style="color:var(--muted)">老師發送的檔案</span>
+                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" style="background:var(--bg);color:var(--muted)" id="recv-count">0 份</span>
+                </div>
+                <div id="recv-list" class="space-y-2 cscroll max-h-60 overflow-y-auto">
+                    <div class="text-xs italic" style="color:var(--border)">尚未收到檔案</div>
+                </div>
+            </section>
+
+            <footer class="text-center py-3">
+                <button onclick="location.reload()" class="text-xs font-medium px-4 py-2 rounded-xl hover:bg-white transition-colors" style="color:var(--muted)">
+                    <i class="fas fa-right-from-bracket mr-1"></i>離開教室
+                </button>
+            </footer>
+        </div>
+    </div>
+
+    <div id="toasts" class="fixed top-4 right-4 z-50 space-y-2" style="max-width:340px"></div>
+
+    <script>
+    var peer = null;
+    var myName = '';
+    var roomCode = '';
+    var teacherConn = null;
+    var selectedFile = null;
+    var CHUNK = 65536;
+    var rxState = null;
+    var transferCounter = 0;
+    var receivedCount = 0;
+
+    /* ========== 工具函式 ========== */
+    function fmtSize(b) {
+        if (b < 1024) return b + ' B';
+        if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+        if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+        return (b / 1073741824).toFixed(2) + ' GB';
+    }
+    function fileIcon(name) {
+        var ext = (name.split('.').pop() || '').toLowerCase();
+        var m = {jpg:'fa-file-image',jpeg:'fa-file-image',png:'fa-file-image',gif:'fa-file-image',webp:'fa-file-image',svg:'fa-file-image',bmp:'fa-file-image',pdf:'fa-file-pdf',doc:'fa-file-word',docx:'fa-file-word',odt:'fa-file-word',xls:'fa-file-excel',xlsx:'fa-file-excel',csv:'fa-file-excel',ppt:'fa-file-powerpoint',pptx:'fa-file-powerpoint',zip:'fa-file-zipper',rar:'fa-file-zipper','7z':'fa-file-zipper',mp4:'fa-file-video',mov:'fa-file-video',avi:'fa-file-video',mkv:'fa-file-video',mp3:'fa-file-audio',wav:'fa-file-audio',ogg:'fa-file-audio',flac:'fa-file-audio',js:'fa-file-code',html:'fa-file-code',css:'fa-file-code',py:'fa-file-code',txt:'fa-file-lines',md:'fa-file-lines',json:'fa-file-lines'};
+        return m[ext] || 'fa-file';
+    }
+    function now() {
+        var d = new Date();
+        return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') + ':' + d.getSeconds().toString().padStart(2,'0');
+    }
+    function isBinaryChunk(d) { return d instanceof ArrayBuffer || d instanceof Uint8Array; }
+    function toUint8(d) {
+        if (d instanceof Uint8Array) return d;
+        if (d instanceof ArrayBuffer) return new Uint8Array(d);
+        return new Uint8Array(0);
+    }
+
+    /* ========== UI ========== */
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+        document.getElementById(id).classList.add('active');
+    }
+    function showToast(msg, type) {
+        type = type || 'info';
+        var box = document.getElementById('toasts');
+        var el = document.createElement('div');
+        var colors = {success:'background:#059669;color:#fff',error:'background:#DC2626;color:#fff',warning:'background:#D97706;color:#fff',info:'background:#1E293B;color:#fff'};
+        var icons = {success:'fa-circle-check',error:'fa-circle-xmark',warning:'fa-triangle-exclamation',info:'fa-circle-info'};
+        el.className = 'toast flex items-start gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium';
+        el.style.cssText = colors[type] || colors.info;
+        el.innerHTML = '<i class="fas ' + (icons[type]||icons.info) + ' mt-0.5"></i><span>' + msg + '</span>';
+        box.appendChild(el);
+        setTimeout(function() { el.classList.add('out'); setTimeout(function() { el.remove(); }, 300); }, 4000);
+    }
+
+    function addReceivedFile(name, size, from, blob) {
+        var box = document.getElementById('recv-list');
+        var ph = box.querySelector('.italic'); if (ph) ph.remove();
+        receivedCount++;
+        document.getElementById('recv-count').textContent = receivedCount + ' 份';
+        var el = document.createElement('div');
+        el.className = 'file-item flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors';
+        el.innerHTML = '<div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:var(--warm-l)"><i class="fas ' + fileIcon(name) + '" style="color:var(--warm)"></i></div>'
+            + '<div class="flex-1 min-w-0"><div class="text-sm font-bold truncate">' + name + '</div><div class="text-[10px]" style="color:var(--muted)">' + fmtSize(size) + ' · 來自 ' + from + ' · ' + now() + '</div></div>'
+            + '<a href="' + URL.createObjectURL(blob) + '" download="' + name + '" class="p-2 rounded-lg hover:bg-amber-50 transition-colors flex-shrink-0" style="color:var(--warm)"><i class="fas fa-download"></i></a>';
+        box.prepend(el);
+    }
+
+    function showSendProg(tid, label) {
+        var area = document.getElementById('progress-area'); area.classList.remove('hidden');
+        var el = document.createElement('div'); el.id = 'prog-' + tid;
+        el.className = 'send-progress-item bg-white rounded-2xl p-4 shadow-sm border space-y-2'; el.style.borderColor = 'var(--border)';
+        el.innerHTML = '<div class="flex items-center justify-between"><span class="text-xs font-bold truncate">' + label + '</span><span class="text-[10px] font-mono" style="color:var(--muted)" id="pct-' + tid + '">0%</span></div><div class="w-full rounded-full h-2 overflow-hidden" style="background:var(--bg)"><div class="progress-fill h-full rounded-full" id="bar-' + tid + '" style="width:0%"></div></div>';
+        area.appendChild(el);
+    }
+    function updateSendProg(tid, pct) {
+        var b = document.getElementById('bar-' + tid), p = document.getElementById('pct-' + tid);
+        if (b) b.style.width = pct + '%'; if (p) p.textContent = Math.round(pct) + '%';
+    }
+    function finishSendProg(tid) {
+        updateSendProg(tid, 100);
+        setTimeout(function() {
+            var e = document.getElementById('prog-' + tid); if (e) e.remove();
+            var a = document.getElementById('progress-area'); if (a && a.children.length === 0) a.classList.add('hidden');
+        }, 2000);
+    }
+    function showRxProg(label) {
+        var area = document.getElementById('progress-area'); area.classList.remove('hidden');
+        var id = 'rx-' + Date.now();
+        var el = document.createElement('div'); el.id = id;
+        el.className = 'send-progress-item bg-white rounded-2xl p-4 shadow-sm border space-y-2'; el.style.borderColor = 'var(--border)';
+        el.innerHTML = '<div class="flex items-center justify-between"><span class="text-xs font-bold truncate" style="color:var(--accent)"><i class="fas fa-arrow-down mr-1.5"></i>' + label + '</span><span class="text-[10px] font-mono" style="color:var(--muted)" id="rpct-' + id + '">0%</span></div><div class="w-full rounded-full h-2 overflow-hidden" style="background:var(--bg)"><div class="h-full rounded-full" id="rbar-' + id + '" style="width:0%;background:linear-gradient(90deg,#059669,#34D399);transition:width .15s ease"></div></div>';
+        area.appendChild(el);
+        return id;
+    }
+    function updateRxProg(id, pct) {
+        var b = document.getElementById('rbar-' + id), p = document.getElementById('rpct-' + id);
+        if (b) b.style.width = pct + '%'; if (p) p.textContent = Math.round(pct) + '%';
+    }
+    function finishRxProg(id) {
+        updateRxProg(id, 100);
+        setTimeout(function() {
+            var e = document.getElementById(id); if (e) e.remove();
+            var a = document.getElementById('progress-area'); if (a && a.children.length === 0) a.classList.add('hidden');
+        }, 1500);
+    }
+
+    /* ========== 檔案選擇 ========== */
+    function handleFile(files) {
+        if (!files || files.length === 0) return;
+        selectedFile = files[0];
+        document.getElementById('file-label').textContent = selectedFile.name + ' (' + fmtSize(selectedFile.size) + ')';
+        document.getElementById('send-btn').disabled = false;
+    }
+    function setupDrop() {
+        var el = document.getElementById('drop-zone');
+        el.addEventListener('dragover', function(e) { e.preventDefault(); el.classList.add('over'); });
+        el.addEventListener('dragleave', function() { el.classList.remove('over'); });
+        el.addEventListener('drop', function(e) { e.preventDefault(); el.classList.remove('over'); handleFile(e.dataTransfer.files); });
+    }
+
+    /* ========== 學生端邏輯 ========== */
+    function joinRoom() {
+        myName = document.getElementById('input-name').value.trim();
+        roomCode = document.getElementById('input-room').value.trim().toUpperCase();
+        if (!myName) { showToast('請輸入您的班級座號姓名', 'warning'); return; }
+        if (!roomCode) { showToast('請輸入教室代碼', 'warning'); return; }
+        var btn = document.getElementById('join-btn');
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>連線中...';
+
+        peer = new Peer();
+        peer.on('open', function() {
+            teacherConn = peer.connect('cls_' + roomCode, { reliable: true });
+            teacherConn.on('open', function() {
+                teacherConn.send({ type: 'join', name: myName });
+                document.getElementById('room-code').textContent = roomCode;
+                document.getElementById('display-name').textContent = myName;
+                showScreen('main-screen');
+                showToast('已成功加入教室', 'success');
+            });
+            teacherConn.on('data', handleData);
+            teacherConn.on('close', function() {
+                showToast('與老師的連線已中斷', 'error');
+                setTimeout(function() { location.reload(); }, 2000);
+            });
+            teacherConn.on('error', function() {
+                showToast('連線錯誤', 'error');
+                btn.disabled = false; btn.innerHTML = '<i class="fas fa-right-to-bracket mr-2"></i>加入教室';
+            });
+        });
+        peer.on('error', function(err) {
+            if (err.type === 'peer-unavailable') showToast('找不到此教室，請確認代碼是否正確', 'error');
+            else showToast('連線失敗：' + err.message, 'error');
+            btn.disabled = false; btn.innerHTML = '<i class="fas fa-right-to-bracket mr-2"></i>加入教室';
+        });
+    }
+
+    function handleData(data) {
+        if (data && data.type === 'file-start') {
+            rxState = { meta: data, chunks: [], progEl: showRxProg('接收中：' + data.fileName) }; return;
+        }
+        if (isBinaryChunk(data)) {
+            if (rxState) {
+                rxState.chunks.push(toUint8(data));
+                var r = 0; for (var i = 0; i < rxState.chunks.length; i++) r += rxState.chunks[i].byteLength;
+                updateRxProg(rxState.progEl, Math.min((r / rxState.meta.fileSize) * 100, 99));
+            }
+            return;
+        }
+        if (data && data.type === 'file-end') {
+            if (rxState) {
+                var blob = new Blob(rxState.chunks, { type: 'application/octet-stream' });
+                var fn = rxState.meta.fileName, sn = rxState.meta.senderName;
+                addReceivedFile(fn, rxState.meta.fileSize, sn, blob);
+                finishRxProg(rxState.progEl);
+                rxState = null;
+                showToast('已收到老師的檔案：' + fn, 'success');
+            }
+            return;
+        }
+    }
+
+    function studentSend() {
+        if (!selectedFile || !teacherConn) return;
+        var tid = 'ss' + (++transferCounter);
+        showSendProg(tid, '傳送給老師：' + selectedFile.name);
+        sendToOne(teacherConn, selectedFile, myName, function() {
+            finishSendProg(tid);
+            showToast('已傳送給老師', 'success');
+            clearFile();
+        });
+    }
+
+    function sendToOne(conn, file, sender, onDone) {
+        conn.send({ type: 'file-start', fileName: file.name, fileSize: file.size, senderName: sender });
+        var reader = new FileReader(), offset = 0;
+        reader.onload = function(e) {
+            conn.send(new Uint8Array(e.target.result));
+            offset += e.target.result.byteLength;
+            if (offset < file.size) readNext(); else { conn.send({ type: 'file-end' }); onDone(); }
+        };
+        reader.onerror = function() { showToast('讀取檔案錯誤', 'error'); };
+        function readNext() { reader.readAsArrayBuffer(file.slice(offset, Math.min(offset + CHUNK, file.size))); }
+        readNext();
+    }
+
+    function clearFile() {
+        selectedFile = null;
+        document.getElementById('file-label').textContent = '拖放檔案至此，或點擊選擇';
+        document.getElementById('file-input').value = '';
+        document.getElementById('send-btn').disabled = true;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        setupDrop();
+        document.getElementById('input-room').addEventListener('keydown', function(e) { if (e.key === 'Enter') joinRoom(); });
+        document.getElementById('input-name').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') document.getElementById('input-room').focus();
+        });
+    });
+    </script>
+</body>
+</html>
