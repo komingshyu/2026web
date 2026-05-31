@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Sites 嵌入網頁還原工具 (可調整版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background-color: #fafafa;
+            color: #0f0f14;
+            /* 禁止頁面預設的拖曳選取文字，優化拖拉體驗 */
+            user-select: none; 
+        }
+        /* 允许在输入框和输出框中選取文字 */
+        textarea, pre, .code-area {
+            user-select: text;
+        }
+        .code-area {
+            font-family: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+            background-color: #0f0f14;
+            color: #a0a0ab;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        /* 自定義捲軸 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #d4d4d8;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: #a1a1aa;
+        }
+        .btn-accent {
+            background-color: #000000;
+            color: #ffffff;
+            transition: all 0.2s;
+        }
+        .btn-accent:hover {
+            background-color: #333333;
+        }
+        .btn-secondary {
+            background-color: #ffffff;
+            color: #0f0f14;
+            border: 1px solid #d4d4d8;
+        }
+        .btn-secondary:hover {
+            background-color: #f3f4f6;
+        }
+        .tab-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            border-bottom: 2px solid transparent;
+            color: #6b6b76;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .tab-btn:hover {
+            color: #0f0f14;
+        }
+        .tab-btn.active {
+            color: #000000;
+            border-bottom-color: #000000;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+    
+    <!-- 頂部標題 -->
+    <header class="bg-white border-b border-gray-200 p-4 flex-shrink-0 z-10 h-16">
+        <div class="max-w-7xl mx-auto flex items-center justify-between h-full">
+            <h1 class="text-xl font-bold tracking-tight text-gray-900">Google Sites 嵌入網頁還原工具</h1>
+            <p class="text-sm text-gray-500 hidden md:block">可調整視窗 / 分離下載功能</p>
+        </div>
+    </header>
+
+    <!-- 主要內容區 -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- 左側：輸入區 (預設寬度 35%) -->
+        <section id="left-pane" class="w-[35%] min-w-[300px] max-w-[60%] flex flex-col bg-white border-r border-gray-200 z-10">
+            <div class="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center shrink-0">
+                <h2 class="font-semibold text-sm text-gray-700">1. 原始碼輸入</h2>
+                <button id="clear-btn" class="text-xs text-red-600 hover:text-red-700 underline">清除</button>
+            </div>
+            <textarea id="source-code" class="flex-1 p-4 text-sm font-mono resize-none focus:outline-none bg-white" placeholder="請在此貼上完整的 HTML 原始碼..."></textarea>
+            <div class="p-4 bg-gray-50 border-t border-gray-200 shrink-0">
+                <button id="process-btn" class="w-full btn-accent py-2 px-4 rounded-md font-medium shadow-sm flex justify-center items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    還原與解碼
+                </button>
+            </div>
+        </section>
+
+        <!-- 可拖拉分隔線 -->
+        <div id="dragbar" class="w-1 bg-gray-300 hover:bg-black cursor-col-resize hidden md:block z-20 transition-colors relative group">
+            <!-- 視覺輔助樣式：拖拉時變黑，並顯示一條垂直線指示 -->
+            <div class="absolute inset-0 hidden group-hover:block w-[4px]"></div>
+        </div>
+
+        <!-- 右側：結果與預覽區 (Flex 1 自動填滿剩餘空間) -->
+        <section id="right-pane" class="flex-1 flex flex-col bg-gray-50 min-w-0">
+            
+            <!-- 頂部工具列 -->
+            <div class="p-2 md:p-3 bg-gray-100 border-b border-gray-200 flex justify-between items-center shrink-0">
+                <!-- 分頁切換 -->
+                <div class="flex space-x-2 md:space-x-4">
+                    <button id="tab-code-btn" class="tab-btn active">程式碼</button>
+                    <button id="tab-preview-btn" class="tab-btn">即時預覽</button>
+                </div>
+
+                <!-- 分離的動作按鈕 -->
+                <div class="flex gap-2">
+                    <button id="open-tab-btn" class="btn-secondary text-xs font-medium px-2 py-1 md:px-3 py-1.5 rounded shadow-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed" disabled title="在新分頁中打開">
+                        <svg class="w-3 h-3 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14m-2.586 2.414a2 2 0 112.828 2.828z"></path></svg>
+                        <span class="hidden md:inline">預覽分頁</span>
+                    </button>
+                    <button id="download-file-btn" class="btn-secondary text-xs font-medium px-2 py-1 md:px-3 py-1.5 rounded shadow-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed" disabled title="直接下載檔案">
+                        <svg class="w-3 h-3 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span class="hidden md:inline">下載檔案</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 狀態訊息 -->
+            <div id="status-msg" class="hidden p-2 md:p-4 text-xs md:text-sm font-medium text-center bg-red-100 text-red-700 border-b border-red-200"></div>
+
+            <!-- 內容顯示容器 -->
+            <div class="flex-1 relative overflow-hidden bg-white">
+                <!-- 程式碼檢視區 -->
+                <div id="view-code" class="absolute inset-0 overflow-auto">
+                    <div id="result-area" class="code-area w-full h-full p-2 md:p-4 text-[11px] md:text-xs leading-relaxed opacity-50">
+                        <span class="text-gray-500 italic">還原的程式碼將顯示在這裡...</span>
+                    </div>
+                </div>
+
+                <!-- 即時預覽區 (預設隱藏) -->
+                <div id="view-preview" class="absolute inset-0 hidden bg-white">
+                    <iframe id="preview-frame" class="w-full h-full border-0" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"></iframe>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // DOM 元素引用
+        const sourceInput = document.getElementById('source-code');
+        const processBtn = document.getElementById('process-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const resultArea = document.getElementById('result-area');
+        
+        const openTabBtn = document.getElementById('open-tab-btn');
+        const downloadFileBtn = document.getElementById('download-file-btn');
+        const statusMsg = document.getElementById('status-msg');
+        
+        // 預覽相關元素
+        const tabCodeBtn = document.getElementById('tab-code-btn');
+        const tabPreviewBtn = document.getElementById('tab-preview-btn');
+        const viewCode = document.getElementById('view-code');
+        const viewPreview = document.getElementById('view-preview');
+        const previewFrame = document.getElementById('preview-frame');
+
+        // 拖拉調整寬度相關元素
+        const dragbar = document.getElementById('dragbar');
+        const leftPane = document.getElementById('left-pane');
+        const rightPane = document.getElementById('right-pane');
+
+        // --- 拖拉調整寬度邏輯 ---
+        let isResizing = false;
+
+        dragbar.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            dragbar.classList.add('bg-black');
+            dragbar.classList.remove('bg-gray-300', 'hover:bg-black');
+            
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', stopResize);
+            
+            // 防止選取文字干擾拖動
+            document.body.style.userSelect = 'none';
+        });
+
+        function handleMouseMove(e) {
+            if (!isResizing) return;
+            
+            const containerWidth = document.querySelector('main').getBoundingClientRect().width;
+            // 計算左側新寬度
+            let newWidth = e.clientX - document.querySelector('main').getBoundingClientRect().left;
+            
+            // 限制最小和最大寬度 (Min 20%, Max 80%)
+            const minWidth = containerWidth * 0.2;
+            const maxWidth = containerWidth * 0.8;
+            
+            if (newWidth >= minWidth && newWidth <= maxWidth) {
+                leftPane.style.width = `${newWidth}px`;
+                // 右側自動佔據剩餘空間 (flex: 1)
+            }
+        }
+
+        function stopResize() {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+            dragbar.classList.remove('bg-black');
+            dragbar.classList.add('bg-gray-300');
+            
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', stopResize);
+            
+            document.body.style.userSelect = '';
+        }
+
+
+        // --- 原有功能邏輯 ---
+
+        clearBtn.addEventListener('click', () => {
+            sourceInput.value = '';
+            resultArea.innerHTML = '<span class="text-gray-500 italic">還原的程式碼將顯示在這裡...</span>';
+            resultArea.classList.add('opacity-50');
+            
+            // 重置按鈕狀態
+            openTabBtn.disabled = true;
+            downloadFileBtn.disabled = true;
+            
+            // 重置預覽
+            previewFrame.srcdoc = '';
+            switchTab('code');
+            statusMsg.classList.add('hidden');
+        });
+
+        function switchTab(mode) {
+            if (mode === 'code') {
+                tabCodeBtn.classList.add('active');
+                tabPreviewBtn.classList.remove('active');
+                viewCode.classList.remove('hidden');
+                viewPreview.classList.add('hidden');
+            } else {
+                tabCodeBtn.classList.remove('active');
+                tabPreviewBtn.classList.add('active');
+                viewCode.classList.add('hidden');
+                viewPreview.classList.remove('hidden');
+                // 如果切換到預覽且有內容，確保刷新 (雖然srcdoc更新是即時的，但確保焦點正確)
+                if(window.restoredHTML) {
+                    previewFrame.srcdoc = window.restoredHTML;
+                }
+            }
+        }
+
+        tabCodeBtn.addEventListener('click', () => switchTab('code'));
+        tabPreviewBtn.addEventListener('click', () => switchTab('preview'));
+
+        processBtn.addEventListener('click', () => {
+            const rawHTML = sourceInput.value.trim();
+            
+            if (!rawHTML) {
+                showStatus('請先輸入原始碼。', 'error');
+                return;
+            }
+
+            try {
+                const dataCodeRegex = /data-code="(.+?)"/s; 
+                const match = rawHTML.match(dataCodeRegex);
+
+                if (!match || !match[1]) {
+                    showStatus('找不到 data-code。', 'error');
+                    return;
+                }
+
+                let encodedContent = match[1];
+                const decodedContent = decodeEntities(encodedContent);
+
+                // 更新顯示
+                resultArea.textContent = decodedContent;
+                resultArea.classList.remove('opacity-50');
+                
+                // 更新預覽
+                previewFrame.srcdoc = decodedContent;
+                
+                // 儲存並啟用按鈕
+                window.restoredHTML = decodedContent;
+                openTabBtn.disabled = false;
+                downloadFileBtn.disabled = false;
+                
+                // 狀態提示
+                showStatus('解碼完成。您可拖拉分隔線調整版面。', 'success');
+
+            } catch (error) {
+                console.error(error);
+                showStatus('解碼錯誤。', 'error');
+            }
+        });
+
+        function decodeEntities(text) {
+            return text
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/&#(\d+);/g, function(match, dec) {
+                    return String.fromCharCode(dec);
+                });
+        }
+
+        // 功能 1: 預覽分頁 (開啟新視窗)
+        openTabBtn.addEventListener('click', () => {
+            if (!window.restoredHTML) return;
+            const blob = new Blob([window.restoredHTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+
+        // 功能 2: 下載檔案 (強制下載)
+        downloadFileBtn.addEventListener('click', () => {
+            if (!window.restoredHTML) return;
+            
+            try {
+                const blob = new Blob([window.restoredHTML], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'restored-embed.html'; // 預設檔名
+                document.body.appendChild(a);
+                a.click();
+                
+                // 清理
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showStatus('下載觸發 (若無反應，請使用「預覽分頁」後手動另存)', 'success');
+            } catch (err) {
+                console.error(err);
+                showStatus('下載失敗 (瀏覽器限制)，請使用「預覽分頁」功能。', 'error');
+            }
+        });
+
+        function showStatus(message, type) {
+            statusMsg.textContent = message;
+            statusMsg.classList.remove('hidden');
+            statusMsg.className = `p-2 md:p-4 text-xs md:text-sm font-medium text-center border-b ${type === 'error' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-green-100 text-green-700 border-green-200'}`;
+            
+            // 3秒後自動隱藏成功訊息
+            if (type === 'success') {
+                setTimeout(() => {
+                    if (statusMsg.textContent === message) {
+                        statusMsg.classList.add('hidden');
+                    }
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>

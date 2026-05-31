@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDB 密碼恢復工具 (修正版)</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --border: #cbd5e1;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        h2 { margin-top: 0; color: var(--primary); }
+        .sub-text { font-size: 0.85rem; color: #64748b; margin-bottom: 1.5rem; line-height: 1.5; }
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 2rem 1rem;
+            margin-bottom: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fdfdfd;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary);
+            background: #eff6ff;
+        }
+        .file-info { font-size: 0.9rem; color: #475569; margin-top: 10px; font-weight: bold; }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        
+        .result-box {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 6px;
+            display: none;
+            text-align: left;
+            font-family: monospace;
+        }
+        .success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+        .error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+        .log-box {
+            margin-top: 1rem;
+            text-align: left;
+            font-size: 0.85rem;
+            color: #64748b;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>MDB 密碼解鎖器 (V3)</h2>
+    <p class="sub-text">已修正位元組偏移錯誤<br>僅支援 Access 97 / 2000 / 2002 / 2003 (.mdb)</p>
+
+    <input type="file" id="fileInput" accept=".mdb" style="display: none;">
+    <div class="drop-zone" id="dropZone">
+        <span id="dropText">點擊選取或拖曳 .mdb 檔案至此</span>
+        <div class="file-info" id="fileInfo"></div>
+    </div>
+
+    <button id="startBtn" disabled>開始分析與解密</button>
+
+    <div class="result-box" id="resultBox"></div>
+    <div class="log-box" id="logBox"></div>
+</div>
+
+<script>
+    /**
+     * Web Worker 程式碼：修正版
+     * 修正了 VB6 (1-based) 到 JS (0-based) 的偏移量轉換
+     */
+    const workerScript = `
+    self.onmessage = function(e) {
+        const { buffer } = e.data;
+        const dataView = new DataView(buffer);
+        
+        try {
+            // 1. 檢查檔案標頭
+            // VB6: Get #iFreeFile, &H5, sFileFlag (1-based index 5)
+            // JS: 0-based index 4 (0x04)
+            const flag = readString(dataView, 0x04, 15);
+            
+            // 額外檢查：有時檔案標頭可能有微小差異，去掉空格再比對較保險
+            // 但標準 MDB 確實就是 "Standard Jet DB"
+            if (flag.trim() !== "Standard Jet DB") {
+                console.log("Header read:", flag);
+                throw new Error("不是標準的 MDB 檔案或檔案損壞。(Header: " + flag + ")");
+            }
+
+            // 2. 讀取版本資訊
+            // VB6: Get #iFreeFile, &H15, bytDB_ID
+            // JS: 0x14
+            const dbId = dataView.getUint8(0x14);
+            let password = "";
+            let versionInfo = "";
+
+            if (dbId === 0) {
+                versionInfo = "Access 97";
+                password = getAccess97Password(dataView);
+            } else if (dbId === 1) {
+                versionInfo = "Access 2000/XP/2003";
+                password = getAccess2000Password(dataView);
+            } else {
+                // 可能是更高版本 (例如 0x02 代表 Access 2007/2010 但副檔名仍是 mdb 的特殊情況)
+                throw new Error("不支援的資料庫版本 ID (" + dbId + ")。請確認是 .mdb 檔案。");
+            }
+
+            // 清理密碼字串
+            password = cleanPassword(password);
+
+            if (password && password.length > 0) {
+                self.postMessage({ 
+                    type: 'success', 
+                    password: password, 
+                    version: versionInfo 
+                });
+            } else {
+                self.postMessage({ 
+                    type: 'fail', 
+                    message: "演算法執行完畢，但密碼為空。<br>可能是該資料庫沒有設置密碼，或者使用了非常規的加密方式。" 
+                });
+            }
+
+        } catch (err) {
+            self.postMessage({ type: 'error', message: err.message });
+        }
+    };
+
+    function readString(view, offset, length) {
+        let str = "";
+        for (let i = 0; i < length; i++) {
+            const charCode = view.getUint8(offset + i);
+            if (charCode === 0) break;
+            str += String.fromCharCode(charCode);
+        }
+        return str;
+    }
+
+    function cleanPassword(pwd) {
+        // 過濾掉控制字元與不可見字元，只保留可見 ASCII 範圍
+        // 注意：這裡過濾掉 chr(0)，這是正確的
+        return pwd.replace(/[\\x00-\\x1F\\x7F]/g, '').trim();
+    }
+
+    // ==========================================
+    // 核心：Access 97 解密
+    // ==========================================
+    function getAccess97Password(view) {
+        // Key: "86FBEC375D449CFAC65E28E613"
+        const sKey97 = "86FBEC375D449CFAC65E28E613";
+        const keyBytes = hexToBytes(sKey97);
+        
+        let pwd = "";
+        // VB6: Get #iFreeFile, &H43, bytFile
+        // JS: 0x42
+        for (let i = 0; i < keyBytes.length; i++) {
+            const fileByte = view.getUint8(0x42 + i);
+            const val = fileByte ^ keyBytes[i];
+            if (val !== 0) {
+                pwd += String.fromCharCode(val);
+            }
+        }
+        return pwd;
+    }
+
+    // ==========================================
+    // 核心：Access 2000 解密
+    // ==========================================
+    function getAccess2000Password(view) {
+        // 1. 讀取加密區塊
+        // VB6: Get #iFreeFile, &H19, bytDateKey (128 bytes)
+        // JS: 0x18
+        const encData = new Uint8Array(view.buffer, 0x18, 128);
+        
+        // 2. RC4 初始化金鑰
+        const rc4Key = [0xC7, 0xDA, 0x39, 0x6B];
+        const sBox = initRC4(rc4Key);
+        
+        // 3. RC4 解密
+        const decData = new Uint8Array(128);
+        cryptRC4(sBox, encData, decData);
+
+        // 4. 計算 lKey
+        const decView = new DataView(decData.buffer);
+        // VB6: CopyMemory dbl, fbytFile(90), 8
+        // fbytFile 是 128 bytes 的陣列，索引 90 (0-based)
+        const dbl = decView.getFloat64(90, true); 
+        const lKey = Math.floor(dbl);
+
+        // 5. 提取密碼
+        let pwd = "";
+        for (let i = 0; i < 20; i++) {
+            // VB6: lRslt(l) = fbytFile(l * 2 + 42) + 256 * fbytFile(l * 2 + 43)
+            // 這裡也是從 fbytFile (decData) 的索引 42 開始讀取
+            const val = decView.getUint16(42 + (i * 2), true);
+            
+            let finalVal = val;
+            if (i % 2 === 0) {
+                finalVal = val ^ lKey;
+            }
+
+            if (finalVal !== 0) {
+                pwd += String.fromCharCode(finalVal);
+            }
+        }
+        return pwd;
+    }
+
+    // --- RC4 演算法實作 ---
+    function initRC4(key) {
+        const S = new Uint8Array(256);
+        for (let i = 0; i < 256; i++) S[i] = i;
+        
+        let j = 0;
+        for (let i = 0; i < 256; i++) {
+            j = (j + S[i] + key[i % key.length]) & 0xFF;
+            const temp = S[i];
+            S[i] = S[j];
+            S[j] = temp;
+        }
+        return S;
+    }
+
+    function cryptRC4(S, input, output) {
+        let i = 0;
+        let j = 0;
+        for (let k = 0; k < input.length; k++) {
+            i = (i + 1) & 0xFF;
+            j = (j + S[i]) & 0xFF;
+            const temp = S[i];
+            S[i] = S[j];
+            S[j] = temp;
+            const keystream = S[(S[i] + S[j]) & 0xFF];
+            output[k] = input[k] ^ keystream;
+        }
+    }
+
+    function hexToBytes(hex) {
+        const bytes = [];
+        for (let c = 0; c < hex.length; c += 2) {
+            bytes.push(parseInt(hex.substr(c, 2), 16));
+        }
+        return bytes;
+    }
+    `;
+
+    // ==========================================
+    // 主程式 UI 邏輯 (無變動)
+    // ==========================================
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const startBtn = document.getElementById('startBtn');
+    const fileInfo = document.getElementById('fileInfo');
+    const resultBox = document.getElementById('resultBox');
+    const logBox = document.getElementById('logBox');
+    const dropText = document.getElementById('dropText');
+
+    let currentFile = null;
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { 
+        e.preventDefault(); 
+        dropZone.classList.add('dragover'); 
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    function handleFile(file) {
+        if (!file.name.toLowerCase().endsWith('.mdb')) {
+            alert('請選擇 .mdb 檔案 (本工具不支援 .accdb)');
+            return;
+        }
+        currentFile = file;
+        dropText.innerText = "更換檔案";
+        fileInfo.innerText = `${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+        startBtn.disabled = false;
+        startBtn.innerText = "開始分析與解密";
+        resultBox.style.display = 'none';
+        resultBox.className = 'result-box';
+        logBox.innerText = '';
+    }
+
+    startBtn.addEventListener('click', () => {
+        if (!currentFile) return;
+        
+        startBtn.disabled = true;
+        startBtn.innerText = "處理中...";
+        resultBox.style.display = 'none';
+        logBox.innerText = "正在讀取檔案二進位資料...";
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            initWorker(e.target.result);
+        };
+        reader.readAsArrayBuffer(currentFile);
+    });
+
+    function initWorker(buffer) {
+        const blob = new Blob([workerScript], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(blob);
+        const worker = new Worker(workerUrl);
+
+        worker.onmessage = function(e) {
+            const data = e.data;
+            startBtn.disabled = false;
+            startBtn.innerText = "開始分析與解密";
+            worker.terminate();
+
+            resultBox.style.display = 'block';
+            
+            if (data.type === 'success') {
+                resultBox.className = 'result-box success';
+                resultBox.innerHTML = `
+                    <strong>✅ 解密成功</strong><br>
+                    版本：${data.version}<br>
+                    密碼：<span style="font-size:1.2em; font-weight:bold; background:white; padding:2px 5px; border:1px solid #ccc;">${data.password}</span>
+                `;
+                logBox.innerText = "演算法執行完畢。";
+            } else if (data.type === 'fail') {
+                resultBox.className = 'result-box error';
+                resultBox.innerHTML = `<strong>⚠️ 未找到密碼</strong><br>${data.message}`;
+                logBox.innerText = "演算法執行完畢。";
+            } else if (data.type === 'error') {
+                resultBox.className = 'result-box error';
+                resultBox.innerHTML = `<strong>❌ 發生錯誤</strong><br>${data.message}`;
+                logBox.innerText = "";
+            }
+        };
+
+        worker.postMessage({ buffer: buffer });
+    }
+</script>
+
+</body>
+</html>
